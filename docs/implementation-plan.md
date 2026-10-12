@@ -5,7 +5,7 @@
 
 本文件是 `mingzhangyang/four-colors` 的详细实现方案与持续维护规格。代码、关卡、素材、测试和发布均在本独立仓库中完成；games 仅在正式发布后提供外链目录入口。
 
-本仓库的独立发布约束和合集接入流程见 [games 的共同交付方案](https://github.com/mingzhangyang/games/blob/main/docs/proposal-graph-puzzles-delivery.md)。
+本仓库的独立发布约束和合集接入流程见 [games 共同交付方案 PR #139](https://github.com/mingzhangyang/games/pull/139)。
 
 ## 1 产品定位与第一分钟
 
@@ -159,7 +159,7 @@ four-colors/                       独立仓库根目录
 
 正式站点可用并完成验收后，才由 games 的独立接入 PR 添加 `site.home.externalGames` 条目及卡片资源，不加入内置 `games` 数组。单款更新仅由其自身 CI 和部署流程处理。
 
-独立仓库建立时，将本设计及必要示意图、数学来源迁入该仓库 docs，作为唯一持续维护的详细规格；games 此文件随后替换为摘要、稳定文档链接和迁移说明。迁移与反向链接确认完成前，保留当前全文，避免丢失交接信息。
+本仓库已经是四色图志的独立维护仓库；本 PR 将设计、示意图和数学来源纳入 docs，合并后以 `docs/implementation-plan.md` 作为唯一持续维护的详细规格。games 仅保留总体交付摘要、外链边界和交接链接；后续规则变更优先在本仓库更新，必要时回写 games 摘要，不在三个仓库持续编辑同一份详细规格。
 
 
 ## 本仓库的交付边界
