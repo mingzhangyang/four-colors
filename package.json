@@ -1,0 +1,28 @@
+{
+  "name": "four-colors",
+  "private": true,
+  "version": "1.0.0",
+  "description": "四色图志 Fourfold Atlas — a standalone four-color map puzzle game.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "content:build": "node tools/generators/four-colors-build.mjs",
+    "content:check": "node tools/generators/four-colors-build.mjs --check",
+    "test": "node tests/verify-four-colors-rules.mjs && node tests/verify-four-colors-levels.mjs && node tests/verify-four-colors-daily.mjs",
+    "smoke": "node tests/smoke-four-colors.mjs",
+    "lint": "eslint .",
+    "verify": "npm run lint && npm run content:check && npm test && npm run build && npm run smoke"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.12.0",
+    "globals": "17.13.0",
+    "playwright": "1.56.1",
+    "vite": "8.3.4"
+  }
+}

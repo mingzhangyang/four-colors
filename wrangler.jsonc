@@ -1,0 +1,12 @@
+// Cloudflare static deployment (Workers static assets, no server code).
+// The custom domain four-colors.orangely.xyz is planned but NOT configured yet;
+// add it under "routes" once DNS is ready, e.g.
+//   "routes": [{ "pattern": "four-colors.orangely.xyz", "custom_domain": true }]
+{
+	"name": "four-colors",
+	"compatibility_date": "2026-09-01",
+	"assets": {
+		"directory": "./dist",
+		"not_found_handling": "404-page"
+	}
+}
