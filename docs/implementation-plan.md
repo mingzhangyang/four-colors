@@ -5,7 +5,7 @@
 
 本文件是 `mingzhangyang/four-colors` 的详细实现方案与持续维护规格。代码、关卡、素材、测试和发布均在本独立仓库中完成；games 仅在正式发布后提供外链目录入口。
 
-共同方向、外链接入、交付批次和数学来源见 [两款图论游戏交付方案](proposal-graph-puzzles-delivery.md)。详细方案的独立仓库副本见 [four-colors/docs/implementation-plan.md](https://github.com/mingzhangyang/four-colors/blob/main/docs/implementation-plan.md)。
+本仓库的独立发布约束和合集接入流程见 [games 的共同交付方案](https://github.com/mingzhangyang/games/blob/main/docs/proposal-graph-puzzles-delivery.md)。
 
 ## 1 产品定位与第一分钟
 
