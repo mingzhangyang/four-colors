@@ -5,7 +5,7 @@
 
 本文件是 `mingzhangyang/four-colors` 的详细实现方案与持续维护规格。代码、关卡、素材、测试和发布均在本独立仓库中完成；games 仅在正式发布后提供外链目录入口。
 
-共同方向、外链接入、交付批次、文档迁移与数学来源见 [两款图论游戏交付方案](proposal-graph-puzzles-delivery.md)。
+共同方向、外链接入、交付批次和数学来源见 [两款图论游戏交付方案](proposal-graph-puzzles-delivery.md)。详细方案的独立仓库副本见 [four-colors/docs/implementation-plan.md](https://github.com/mingzhangyang/four-colors/blob/main/docs/implementation-plan.md)。
 
 ## 1 产品定位与第一分钟
 
@@ -115,9 +115,9 @@ four-colors/                       独立仓库根目录
     input/{pointer,keyboard}.js
     services/{settings,daily,hints,export}.js
     storage.js / i18n.js / audio.js
-  tools/generators/fourfold-atlas-build.mjs
-  tests/verify-fourfold-atlas-{rules,levels,daily}.mjs
-  tests/smoke-fourfold-atlas.mjs
+  tools/generators/four-colors-build.mjs
+  tests/verify-four-colors-{rules,levels,daily}.mjs
+  tests/smoke-four-colors.mjs
 ```
 
 **关卡主数据：**`id, revision, mode, chapter, mesh, fixedColors, initialColors, allowedActions, goals, witness, difficultyTags, artAnchors`。mesh 存共享顶点、边与区域环；边界折线通过同一组边 ID 复用。编译器从共享边推导邻接表与 SVG path；运行时加载编译结果，并检查内容校验和。不维护第二份人工邻接表。
