@@ -842,6 +842,9 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
         p.state = res.state;
         p.override = null;
         p.pulse = false;
+        // a hint in flight answers a state that no longer exists: stop it now, so the
+        // Worker is free and the hint button works again without waiting for the reply
+        if (p.hintPending && p.state.stateRevision !== before.stateRevision) hints.cancelAll();
         if (cmd.type === 'select' || cmd.type === 'hint-used') {
             renderPlay();
             scheduleSave();

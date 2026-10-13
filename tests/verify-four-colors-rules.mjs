@@ -391,6 +391,16 @@ test('trimming a stored history keeps the swaps it drops in the swap total', () 
     const reset = { ...serializeState({ ...createState(p), colors: [0, 1], undo: [...swaps(3), restart, ...swaps(42)] }), touchedAt: 1 };
     assert.equal(swapCount(restoreState(p, reset)), 42);
     assert.equal(swapCount(restoreState(p, trimSavedHistory(reset, 40))), 42);
+    // after undoing most of a long run the redo stack is capped on its own
+    const run = swaps(200);
+    const undone = { ...serializeState({ ...createState(p), colors: [0, 1], undo: run.slice(0, 10), redo: run.slice(10).reverse() }), touchedAt: 1 };
+    const capped = trimSavedHistory(undone, 40);
+    assert.equal(capped.undo.length, 10);
+    assert.equal(capped.redo.length, 40);
+    assert.equal(capped.truncated, false, 'the undo range is intact');
+    const restored = restoreState(p, capped);
+    assert.equal(restored.redo.length, 40, 'the kept redo entries still replay');
+    assert.deepEqual(execute(p, restored, { type: 'redo' }).state.colors, [1, 0], 'the next redo is kept');
 });
 
 test('storage trySet reports failure; save never claims success on failure', () => {

@@ -315,7 +315,8 @@ await scenario('hints: a reply for an older state is dropped; a silent worker ti
     await openTray(page);
     await page.click('.tray-hint');
     await pickColor(page, 0);
-    await tap(page, 0); // state changes while the hint is in flight
+    await tap(page, 0); // state changes while the hint is in flight: it is cancelled at once
+    await page.waitForFunction(() => !window.__fourColors.play.hintPending, null, { timeout: 300 });
     await page.waitForTimeout(700);
     assert.equal(await page.evaluate(() => window.__fourColors.play.hint), null);
     assert.doesNotMatch(await statusText(page), /看看/);

@@ -274,16 +274,21 @@ export function serializeState(state, maxHistory = MAX_HISTORY) {
     };
 }
 
-/** Trim a stored session to its last `max` undo/redo entries, keeping its swap total. */
+/**
+ * Trim a stored session to its last `max` undo and `max` redo entries (each
+ * stack on its own), keeping the swap total of the undo entries it drops.
+ */
 export function trimSavedHistory(saved, max) {
-    if (!Array.isArray(saved.undo) || saved.undo.length <= max) return saved;
-    const cut = saved.undo.length - max;
+    const undo = Array.isArray(saved.undo) ? saved.undo : [];
+    const redo = Array.isArray(saved.redo) ? saved.redo : [];
+    if (undo.length <= max && redo.length <= max) return saved;
+    const cut = Math.max(0, undo.length - max);
     const dropped = Number.isInteger(saved.droppedSwaps) && saved.droppedSwaps >= 0 ? saved.droppedSwaps : 0;
     return {
         ...saved,
-        undo: saved.undo.slice(cut),
-        redo: Array.isArray(saved.redo) ? saved.redo.slice(-max) : [],
-        droppedSwaps: countDropped(dropped, saved.undo.slice(0, cut)),
-        truncated: true,
+        undo: undo.slice(cut),
+        redo: redo.slice(-max), // the next redo is last
+        droppedSwaps: countDropped(dropped, undo.slice(0, cut)),
+        truncated: Boolean(saved.truncated) || cut > 0,
     };
 }
