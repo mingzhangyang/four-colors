@@ -1,6 +1,8 @@
-// Daily map dates use one clock for everyone: UTC+8. A daily session locks the
-// date and content revision it was opened with, so a page started before
-// midnight is still finished as the same puzzle afterwards.
+// Daily maps are numbered puzzles (No.1 … No.N), not calendar dates. One rule
+// picks today's number for everyone: No. = UTC+8 days since the manifest epoch
+// + 1. Opening a number keeps it (it is carried in the URL and the session),
+// so a page started before midnight is still finished as the same puzzle.
+// Every earlier number stays playable in the archive.
 
 const DAY = 24 * 3600 * 1000;
 const OFFSET = 8 * 3600 * 1000;
@@ -24,31 +26,55 @@ export function formatCountdown(ms) {
     return `${h}:${String(m).padStart(2, '0')}`;
 }
 
+function dayNumber(date) {
+    const [y, m, d] = date.split('-').map(Number);
+    return Math.round(Date.UTC(y, m - 1, d) / DAY);
+}
+
+/** Today's daily number for a UTC+8 date (≤ 0 before the epoch). */
+export function dailyNumber(manifest, date) {
+    return dayNumber(date) - dayNumber(manifest.epoch) + 1;
+}
+
+/** The UTC+8 date on which a number is "today". */
+export function dateOfNumber(manifest, no) {
+    const t = new Date((dayNumber(manifest.epoch) + no - 1) * DAY);
+    return t.toISOString().slice(0, 10);
+}
+
 /**
- * Where today stands in the manifest.
- * state: 'today' (entry for this date), 'before' (bank not started), 'expired' (bank used up)
+ * state: 'today' (a numbered puzzle for today), 'before' (bank not started),
+ * 'expired' (all numbers released; the archive stays open)
  */
 export function dailyStatus(manifest, date) {
+    const no = dailyNumber(manifest, date);
     const entries = manifest.entries;
-    if (!entries.length) return { state: 'expired', entry: null };
-    const entry = entries.find(e => e.date === date) || null;
-    if (entry) return { state: 'today', entry };
-    if (date < entries[0].date) return { state: 'before', entry: null, startDate: entries[0].date };
-    return { state: 'expired', entry: null };
+    if (no < 1) return { state: 'before', no, entry: null, startDate: manifest.epoch };
+    const entry = entries.find(e => e.no === no) || null;
+    if (entry) return { state: 'today', no, entry };
+    return { state: 'expired', no, entry: null };
 }
 
-export function featuredEntries(manifest) {
-    return manifest.featured.map(id => manifest.entries.find(e => e.id === id)).filter(Boolean);
+/** Numbers that may be opened today: every released number up to today's. */
+export function isReleased(manifest, date, no) {
+    const today = dailyNumber(manifest, date);
+    return Number.isInteger(no) && no >= 1 && no <= today && manifest.entries.some(e => e.no === no);
 }
 
-/** Session to resume for the daily tab: the locked one if it is unfinished, else today's. */
-export function dailySessionPlan(snapshotDaily, manifest, today) {
-    const status = dailyStatus(manifest, today);
-    const locked = snapshotDaily.session;
-    const lockedRecord = locked ? snapshotDaily.records[locked.date] : null;
-    const unfinishedOld = locked && locked.date !== today && !(lockedRecord && lockedRecord.completed)
-        ? locked : null;
-    return { status, unfinishedOld, newDay: Boolean(locked && locked.date !== today) };
+/** Earlier numbers, newest first. */
+export function archiveEntries(manifest, date) {
+    const today = dailyNumber(manifest, date);
+    return manifest.entries.filter(e => e.no < today).sort((a, b) => b.no - a.no);
+}
+
+/** What the daily tab offers: today's number and an unfinished earlier one. */
+export function dailySessionPlan(snapshotDaily, manifest, date) {
+    const status = dailyStatus(manifest, date);
+    const sess = snapshotDaily.session;
+    const record = sess ? snapshotDaily.records[sess.id] : null;
+    const unfinishedOld = sess && sess.no !== status.no && !(record && record.completed) ? sess : null;
+    // a new day: today's number exists and differs from the one last opened
+    return { status, unfinishedOld, newDay: Boolean(sess && status.state === 'today' && sess.no !== status.no) };
 }
 
 export function countRestoredDays(records) {

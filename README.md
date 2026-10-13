@@ -2,7 +2,7 @@
 
 用四种颜色修复一部失色地图册：相邻区域不同色，在边界之间寻找协调的秩序。独立开发、独立部署的单页解谜游戏（vanilla JavaScript + Vite + SVG）。
 
-当前阶段：**首发候选已实现**——32 个主线关、8 个修复短篇、60 天每日地图、收藏配色与导出均可玩，模型/内容/浏览器测试通过；尚未部署，尚未做真人试玩与真机验收（见 [实现状态](docs/implementation-status.md)）。
+当前阶段：**首发候选已实现**——32 个主线关、8 个修复短篇、60 张编号每日地图、收藏配色与导出均可玩，模型/内容/浏览器测试通过；部署已配置为 Cloudflare 自动部署，尚未做真人试玩与真机验收（见 [实现状态](docs/implementation-status.md)）。
 
 - [完整实现方案（持续维护的详细规格）](docs/implementation-plan.md)
 - [实现状态与验收证据](docs/implementation-status.md)
@@ -10,7 +10,7 @@
 - [四色地图示意图](docs/diagrams/fourfold-atlas-four-colors.svg)
 - [Mini Games Collection](https://github.com/mingzhangyang/games)
 
-建议部署地址：`https://four-colors.orangely.xyz`（尚未配置）。
+正式地址：`https://four-colors.orangely.xyz`——Cloudflare Workers Builds 关联本仓库，推送 `main` 自动部署（首次关联步骤见 [部署与回滚](docs/deploy.md)）。
 
 ## 快速开始
 
@@ -24,7 +24,8 @@ npm run verify         # lint + 内容检查 + 模型/关卡/每日测试 + 构�
 | 命令 | 作用 |
 | --- | --- |
 | `npm run content:build` | 由 `tools/levels/*.mjs` 规格重新生成关卡主数据与运行时模块 |
-| `npm run content:check` | 在内存中重新生成并与提交的文件逐字比对；拓扑变化未升 revision、或已排期的每日条目被改写时失败 |
+| `npm run content:check` | 在内存中重新生成并与提交的文件逐字比对；拓扑变化未升 revision、已发布的每日编号被改写或起始日被移动时失败 |
+| `npm run build:cloudflare` | Cloudflare Workers Builds 使用的构建命令：内容检查 + 测试 + 构建 |
 | `npm test` | `tests/verify-four-colors-{rules,levels,daily}.mjs` |
 | `npm run smoke` | `tests/smoke-four-colors.mjs`，用 Playwright Chromium 驱动 `dist/` |
 | `node tools/checks/budget.mjs` | 首屏 JS gzip 预算（≤150 KB） |
@@ -49,11 +50,11 @@ tools/
   lib/                                几何、Voronoi、网格构建、编译器、手绘抖动、谜题构造
   levels/{main,daily,shapes}.mjs      关卡规格；revisions.lock.json 锁定拓扑与 revision
 content/master/*.json          关卡主数据（共享顶点、边、区域环、线索、见证、证书）
-content/daily-lock.json        已排期每日条目（只追加，不改写）
-public/daily/*.json            每日题库，按 revision 命名，首次需要时才下载
+content/daily-lock.json        已发布的每日编号与起始日（只追加，不改写）
+public/daily/*.json            编号每日题库（No.1…），按 revision 命名，首次需要时才下载
 tests/                         模型、内容、每日与浏览器回归
 ```
 
 ## 独立性
 
-本仓库自带构建、依赖、设置、版本化存档、UTC+8 每日日期工具与 CI；不加载 games 的 CSS、运行时或远程脚本。返回合集使用固定链接 `https://games.orangely.xyz/`。语言与主题可由 `?lang=en|zh`、`?theme=light|dark|system` 初始化，已保存的偏好优先，声音默认静音且不经 URL 传递。
+本仓库自带构建、依赖、设置、版本化存档、UTC+8 每日编号规则与 CI；不加载 games 的 CSS、运行时或远程脚本。返回合集使用固定链接 `https://games.orangely.xyz/`。语言与主题可由 `?lang=en|zh`、`?theme=light|dark|system` 初始化，已保存的偏好优先，声音默认静音且不经 URL 传递。

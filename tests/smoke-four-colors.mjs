@@ -11,6 +11,7 @@ import { existsSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { startServer } from './lib/serve.mjs';
 import manifest from '../src/content/generated/daily-manifest.js';
+import { dateOfNumber } from '../src/services/daily.js';
 
 const DIST = process.env.SMOKE_DIR || 'dist';
 if (!existsSync(`${DIST}/index.html`)) {
@@ -463,30 +464,44 @@ await scenario('multi-tab: newer progress from another tab is not silently overw
     await ctx.close();
 });
 
-await scenario('daily: UTC+8 date, lazy load, locked across midnight, new day noted in the atlas', async () => {
-    const entry = manifest.entries[8];
-    const t1 = Date.parse(`${entry.date}T15:50:00Z`); // 23:50 UTC+8
+await scenario('daily: numbered puzzles, today by UTC+8 day, kept across midnight, archive', async () => {
+    const entry = manifest.entries[8]; // No.9
+    const t1 = Date.parse(`${dateOfNumber(manifest, entry.no)}T15:50:00Z`); // 23:50 UTC+8 on No.9's day
     const { page, ctx, errors } = await open({ hash: '#/daily', clock: t1, seed: seedDone(['FC01']) });
     await waitPlay(page, entry.id);
+    assert.equal(new URL(page.url()).hash, '#/daily/9', 'the number is carried in the URL');
+    assert.match(await page.locator('.topbar-title .title').textContent(), /No\.9/);
+    const [r0, r1] = await page.evaluate(() => window.__fourColors.play.level.fixed.map((c, i) => (c < 0 ? i : -1)).filter(i => i >= 0));
     await pickColor(page, 0);
-    await tap(page, 0);
-    await page.clock.setSystemTime(t1 + 20 * 60 * 1000); // 00:10 next day
+    await tap(page, r0);
+    await page.clock.setSystemTime(t1 + 20 * 60 * 1000); // 00:10 UTC+8, No.10's day
     await pickColor(page, 1);
-    await tap(page, 1);
+    await tap(page, r1);
     assert.equal(await page.evaluate(() => window.__fourColors.play.level.id), entry.id, 'same puzzle after midnight');
+    await page.reload();
+    await waitPlay(page, entry.id);
+    assert.equal((await colors(page))[r1], 1, 'reloading after midnight still finishes No.9');
     await page.evaluate(() => { location.hash = '#/atlas/daily'; });
     await page.waitForSelector('.daily');
-    assert.match(await page.locator('.tab-panel').textContent(), /新的一天/);
-    assert.match(await page.locator('.tab-panel').textContent(), new RegExp(entry.date));
+    const panel = await page.locator('.tab-panel').textContent();
+    assert.match(panel, /新的一天/);
+    assert.match(panel, /No\.10/);
+    assert.match(panel, /继续 No\.9/);
+    assert.equal(await page.locator('.daily-tile').count(), 9, 'No.1–No.9 are in the archive');
+    await page.evaluate(() => { location.hash = '#/daily/11'; });
+    await page.waitForSelector('.atlas');
+    assert.equal(new URL(page.url()).hash, '#/atlas/daily', 'future numbers do not open early');
     await page.evaluate(() => { location.hash = '#/daily'; });
     await waitPlay(page, manifest.entries[9].id);
+    await page.evaluate(() => { location.hash = '#/daily/3'; });
+    await waitPlay(page, manifest.entries[2].id);
     assert.deepEqual(errors, []);
     await ctx.close();
 });
 
 await scenario('daily: a failed download offers a retry instead of breaking the page', async () => {
     srv.server.failDaily = true;
-    const { page, ctx } = await open({ hash: '#/daily', clock: Date.parse(`${manifest.entries[3].date}T04:00:00Z`), seed: seedDone(['FC01']) });
+    const { page, ctx } = await open({ hash: '#/daily', clock: Date.parse(`${dateOfNumber(manifest, 4)}T04:00:00Z`), seed: seedDone(['FC01']) });
     await page.waitForSelector('.toast .toast-actions', { timeout: 5000 });
     assert.match(await page.locator('.toast').textContent(), /暂时无法载入/);
     srv.server.failDaily = false;

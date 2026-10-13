@@ -1487,6 +1487,51 @@ a.level-card:hover {
     color: var(--ink-soft);
 }
 
+.daily-archive {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+    gap: 8px;
+}
+
+.daily-tile {
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-height: 52px;
+    border-radius: 8px;
+    background: var(--paper);
+    box-shadow: var(--shadow-soft);
+    text-decoration: none;
+    font: 600 14px var(--serif);
+}
+
+.daily-tile.is-done {
+    background: var(--paper-2);
+}
+
+.daily-tile-mark {
+    position: absolute;
+    right: 4px;
+    top: 4px;
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    border: 1.5px solid var(--accent);
+    color: var(--accent);
+}
+
+.daily-tile-mark.independent {
+    background: var(--accent);
+    color: var(--paper);
+}
+
+.daily-tile-mark .icon {
+    width: 12px;
+    height: 12px;
+}
+
 .full-work-card {
     display: flex;
     flex-wrap: wrap;

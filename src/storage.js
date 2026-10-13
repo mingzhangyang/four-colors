@@ -114,7 +114,7 @@ export function validateSnapshot(raw) {
     snap.writer = typeof raw.writer === 'string' ? raw.writer.slice(0, 40) : null;
     snap.savedAt = Number.isFinite(raw.savedAt) ? raw.savedAt : 0;
     snap.visited = raw.visited === true;
-    if (isObj(raw.current) && ['main', 'story', 'daily', 'featured', 'collect'].includes(raw.current.kind)
+    if (isObj(raw.current) && ['main', 'story', 'daily', 'collect'].includes(raw.current.kind)
         && isId(raw.current.id) && isRev(raw.current.revision)) {
         snap.current = { kind: raw.current.kind, id: raw.current.id, revision: raw.current.revision };
         if (raw.current.kind === 'collect' && typeof raw.current.uid === 'string') snap.current.uid = raw.current.uid.slice(0, 40);
@@ -143,13 +143,16 @@ export function validateSnapshot(raw) {
         }
     }
     if (isObj(raw.daily)) {
+        // session: the numbered daily last opened and the UTC+8 date it was opened on
         const s = raw.daily.session;
-        if (isObj(s) && isDate(s.date) && isId(s.id) && isRev(s.revision)) snap.daily.session = { date: s.date, id: s.id, revision: s.revision };
+        if (isObj(s) && isDate(s.date) && isId(s.id) && isRev(s.revision) && Number.isInteger(s.no) && s.no >= 1 && s.no < 100000) {
+            snap.daily.session = { date: s.date, no: s.no, id: s.id, revision: s.revision };
+        }
+        // records are keyed by the numbered puzzle id (D001 …), never by date
         if (isObj(raw.daily.records)) {
-            for (const [date, r] of Object.entries(raw.daily.records)) {
-                if (!isDate(date) || !isObj(r) || !isId(r.id) || !isRev(r.revision)) continue;
-                snap.daily.records[date] = {
-                    id: r.id,
+            for (const [id, r] of Object.entries(raw.daily.records)) {
+                if (!isId(id) || !isObj(r) || !isRev(r.revision)) continue;
+                snap.daily.records[id] = {
                     revision: r.revision,
                     completed: r.completed === true,
                     assisted: r.assisted === true,

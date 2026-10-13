@@ -4,7 +4,7 @@
 
 import { t, tx, setLang, getLang, colorWithPattern, listJoin } from './i18n.js';
 import {
-    index, manifest, loadLevel, loadChapter, loadStories, nextMainId, loadDaily, dailyEntryById,
+    index, manifest, loadLevel, loadChapter, loadStories, nextMainId, loadDaily,
 } from './content/levels.js';
 import { chapterById, paletteFor } from './content/chapters.js';
 import { EMPTY, evaluate } from './model/rules.js';
@@ -17,7 +17,7 @@ import { el, clear, icon } from './render/dom.js';
 import { attachPointer } from './input/pointer.js';
 import { attachKeyboard, spatialNext } from './input/keyboard.js';
 import {
-    utc8Date, msUntilNextDay, formatCountdown, dailyStatus, featuredEntries, dailySessionPlan, countRestoredDays,
+    utc8Date, msUntilNextDay, formatCountdown, dailyStatus, dailySessionPlan, countRestoredDays, archiveEntries, isReleased,
 } from './services/daily.js';
 import { renderPage, renderMosaic, downloadCanvas, stampPattern } from './services/export.js';
 import { sessionKey, MAX_SESSIONS, MAX_COLLECTION, MAX_IDLE_HISTORY, MAX_SAVED_HISTORY } from './storage.js';
@@ -37,6 +37,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
     let saveFailedShown = false;
     let sessionSeq = 0;
     let routeToken = 0;
+    let newDayShown = false;
 
     // ───────────────────────── shell ─────────────────────────
     const topbar = el('header', { class: 'topbar' });
@@ -229,29 +230,28 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
     }
 
     function dailyBadge() {
-        const today = utc8Date(now());
-        const st = dailyStatus(manifest, today);
+        const st = dailyStatus(manifest, utc8Date(now()));
         if (st.state !== 'today') return false;
-        const rec = snap.daily.records[today];
+        const rec = snap.daily.records[st.entry.id];
         return !(rec && rec.completed);
     }
 
     function dailyInfo() {
         const today = utc8Date(now());
         const plan = dailySessionPlan(snap.daily, manifest, today);
-        const todayRecord = snap.daily.records[today] || null;
-        const sess = snap.daily.session;
+        const todayRecord = plan.status.entry ? snap.daily.records[plan.status.entry.id] || null : null;
+        const todayStarted = Boolean(plan.status.entry && Object.keys(snap.sessions).some(k => k.startsWith(`${plan.status.entry.id}@`)));
         return {
             today,
             status: plan.status,
             todayRecord,
-            todayStarted: Boolean(sess && sess.date === today),
+            todayStarted,
             unfinishedOld: plan.unfinishedOld,
-            newDay: plan.newDay && !(todayRecord && todayRecord.completed) && !(sess && sess.date === today),
+            newDay: plan.newDay && !(todayRecord && todayRecord.completed) && !todayStarted,
             restoredDays: countRestoredDays(snap.daily.records),
             countdown: formatCountdown(msUntilNextDay(now())),
-            featured: featuredEntries(manifest),
-            showFeatured: Boolean(todayRecord && todayRecord.completed),
+            archive: archiveEntries(manifest, today).map(e => ({ ...e, record: snap.daily.records[e.id] || null })),
+            total: manifest.entries.length,
         };
     }
 
@@ -425,8 +425,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
         if (a === 'atlas') return { name: 'atlas', tab: b };
         if (a === 'p' && b) return { name: 'play', kind: 'main', id: b.toUpperCase() };
         if (a === 's' && b) return { name: 'play', kind: 'story', id: b.toUpperCase() };
-        if (a === 'f' && b) return { name: 'play', kind: 'featured', id: b.toUpperCase() };
-        if (a === 'daily') return { name: 'play', kind: 'daily', date: b || null };
+        if (a === 'daily') return { name: 'play', kind: 'daily', no: b ? Number(b) : null };
         if (a === 'collect' && b) return { name: 'play', kind: 'collect', id: b.toUpperCase() };
         if (a === 'c' && b) return { name: 'play', kind: 'collect', uid: b };
         if (a === 'full') return { name: 'full' };
@@ -462,7 +461,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
     window.addEventListener('hashchange', () => route());
 
     function goAtlas() {
-        const tab = play ? (play.kind === 'story' ? 'stories' : play.kind === 'daily' || play.kind === 'featured' ? 'daily'
+        const tab = play ? (play.kind === 'story' ? 'stories' : play.kind === 'daily' ? 'daily'
             : play.kind === 'collect' ? 'collection' : `ch${play.level.chapter}`) : atlasTab;
         location.hash = `#/atlas/${tab}`;
     }
@@ -485,7 +484,11 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
         atlas.render();
         refreshChrome();
         scheduleSave();
-        if (atlasTab === 'daily' && dailyInfo().newDay && !toasts.has('newday')) toasts.show('newday', t('daily.newDay'));
+        // a new daily number is announced on return to the atlas; the daily tab shows it inline
+        if (atlasTab !== 'daily' && dailyInfo().newDay && !newDayShown) {
+            newDayShown = true;
+            toasts.show('newday', t('daily.newDay'), { actions: [{ label: t('tabs.daily'), primary: true, run: () => { location.hash = '#/atlas/daily'; } }] });
+        }
     }
 
     function showError(err) {
@@ -511,39 +514,28 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
     async function openPlay(r, token, force) {
         let level;
         const kind = r.kind;
-        let dailyDate = null;
         let collectItem = null;
         if (kind === 'main' || kind === 'story') {
             level = await loadLevel(r.id);
             if (!level || level.mode !== (kind === 'main' ? 'main' : 'story')) { location.hash = '#/'; return; }
-        } else if (kind === 'featured') {
-            const entry = dailyEntryById(r.id);
-            if (!entry || !manifest.featured.includes(entry.id)) { location.hash = '#/atlas/daily'; return; }
-            level = await loadDaily(entry);
         } else if (kind === 'daily') {
+            // numbered dailies: “today” is a rule (days since the epoch + 1); the number
+            // then lives in the URL, so a page opened before midnight stays the same puzzle
             const today = utc8Date(now());
-            let sess = snap.daily.session;
-            if (r.date && sess && sess.date === r.date) {
-                // resume the locked (possibly earlier) session as the same puzzle
-            } else if (sess && sess.date === today) {
-                // already locked for today
-            } else {
-                const st = dailyStatus(manifest, today);
-                if (st.state !== 'today') { location.hash = '#/atlas/daily'; return; }
-                sess = { date: today, id: st.entry.id, revision: st.entry.revision };
-                snap.daily.session = sess;
-            }
-            const entry = manifest.entries.find(e => e.id === sess.id && e.revision === sess.revision);
-            if (!entry) { location.hash = '#/atlas/daily'; return; }
+            const st = dailyStatus(manifest, today);
+            const no = r.no ?? (st.state === 'today' ? st.no : null);
+            if (no == null || !isReleased(manifest, today, no)) { location.hash = '#/atlas/daily'; return; }
+            if (r.no == null) history.replaceState(null, '', `#/daily/${no}`);
+            const entry = manifest.entries.find(e => e.no === no);
             try {
                 level = await loadDaily(entry);
-            } catch (err) {
+            } catch {
                 if (token !== routeToken) return;
                 toasts.show('daily', t('daily.loadFailed'), { actions: [{ label: t('daily.retry'), primary: true, run: () => route(true) }] });
                 location.hash = '#/atlas/daily';
                 return;
             }
-            dailyDate = sess.date;
+            snap.daily.session = { date: today, no, id: entry.id, revision: entry.revision };
         } else if (kind === 'collect') {
             if (r.uid) {
                 collectItem = snap.collection.find(c => c.uid === r.uid);
@@ -558,7 +550,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
         if (token !== routeToken) return;
         if (!force && play && play.level.id === level.id && play.kind === kind && !collectItem) return;
         leavePlay();
-        mountPlay({ level, kind, dailyDate, collectItem });
+        mountPlay({ level, kind, collectItem });
     }
 
     function puzzleFor(level, kind, collectColors) {
@@ -570,7 +562,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
         return { ...level, actions };
     }
 
-    function mountPlay({ level, kind, dailyDate, collectItem }) {
+    function mountPlay({ level, kind, collectItem }) {
         let colorsSeed = null;
         if (kind === 'collect') {
             const rec = snap.progress[level.id];
@@ -604,7 +596,6 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
             kind,
             state,
             sessionId: ++sessionSeq,
-            dailyDate,
             collectUid: collectItem ? collectItem.uid : null,
             collectTexture: collectItem ? collectItem.texture : settings.get('texture'),
             eval: null,
@@ -657,7 +648,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
     function pageTitle() {
         if (!play) return '';
         const lv = play.level;
-        if (lv.mode === 'daily') return play.kind === 'featured' ? `${t('daily.featured')} ${lv.id}` : t('daily.today', { date: lv.date });
+        if (lv.mode === 'daily') return t('daily.number', { no: lv.no });
         return tx(lv.name);
     }
 
@@ -1126,10 +1117,9 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
             challengeNew = true;
         }
         snap.progress[lv.id] = rec;
-        if (p.kind === 'daily' && p.dailyDate) {
-            const prev = snap.daily.records[p.dailyDate];
-            snap.daily.records[p.dailyDate] = {
-                id: lv.id,
+        if (p.kind === 'daily') {
+            const prev = snap.daily.records[lv.id];
+            snap.daily.records[lv.id] = {
                 revision: lv.revision,
                 completed: true,
                 assisted: prev && prev.completed ? prev.assisted && p.state.hintsUsed > 0 : p.state.hintsUsed > 0,
@@ -1162,7 +1152,8 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
             assist: rec && rec.independent ? t('share.independent') : t('share.assisted'),
             pattern: stampPattern(p.level.id),
         });
-        const url = p.kind === 'main' ? `${SITE_URL}#/p/${p.level.id}` : p.kind === 'story' ? `${SITE_URL}#/s/${p.level.id}` : SITE_URL;
+        const url = p.kind === 'main' ? `${SITE_URL}#/p/${p.level.id}` : p.kind === 'story' ? `${SITE_URL}#/s/${p.level.id}`
+            : p.kind === 'daily' ? `${SITE_URL}#/daily/${p.level.no}` : SITE_URL;
         try {
             if (navigator.share) {
                 await navigator.share({ text, url });
@@ -1206,7 +1197,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
             const canvas = renderPage(level, colors, {
                 palette: paletteFor(level.chapter, settings.get('skin')),
                 texture,
-                title: `${t('app.title')} · ${level.mode === 'daily' ? level.date : tx(level.name)}`,
+                title: `${t('app.title')} · ${level.mode === 'daily' ? t('daily.number', { no: level.no }) : tx(level.name)}`,
                 subtitle: level.mode === 'main' ? `${tx(chapterById(level.chapter).name)} · ${t('level.page', { n: level.index })}` : '',
                 seal: isDone(level.id) ? t('complete.stamp') : '',
             });

@@ -379,7 +379,7 @@ test('snapshot validation drops corrupted parts', () => {
         current: { kind: 'main', id: 'FC01', revision: 1 },
         sessions: { 'FC01@1': { colors: [0, 1, -1] }, 'bad key': { colors: [0] }, 'FC02@1': { colors: [7] } },
         progress: { FC01: { revision: 1, completed: true, independent: 'yes', solution: [0, 1] }, '../x': { revision: 1 } },
-        daily: { session: { date: '2026-10-12', id: 'D001', revision: 1 }, records: { nope: {} } },
+        daily: { session: { date: '2026-10-13', no: 1, id: 'D001', revision: 1 }, records: { nope: {}, D001: { revision: 1, completed: true }, '2026-10-13': { revision: 1 } } },
         collection: [{ uid: 'a', id: 'FC01', revision: 1, colors: [0, 1] }, { uid: 3 }],
     };
     const v = validateSnapshot(raw);
@@ -387,7 +387,9 @@ test('snapshot validation drops corrupted parts', () => {
     assert.equal(v.progress.FC01.completed, true);
     assert.equal(v.progress.FC01.independent, false);
     assert.equal(Object.keys(v.progress).length, 1);
-    assert.deepEqual(v.daily.records, {});
+    assert.deepEqual(v.daily.session, { date: '2026-10-13', no: 1, id: 'D001', revision: 1 });
+    assert.deepEqual(Object.keys(v.daily.records), ['D001'], 'daily records are keyed by numbered puzzle id');
+    assert.equal(validateSnapshot({ ...raw, daily: { session: { date: '2026-10-13', id: 'D001', revision: 1 } } }).daily.session, null, 'a session without its number is dropped');
     assert.equal(v.collection.length, 1);
     assert.equal(validateSnapshot('garbage').schema, 1);
     assert.equal(validateSnapshot({ schema: 99 }).current, null);

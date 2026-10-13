@@ -7,7 +7,7 @@
 //     → puzzle construction + certificates (tools/lib/puzzle.mjs, src/model/*)
 //     → level master data   content/master/*.json        (mesh, clues, witness, certs)
 //     → runtime modules      src/content/generated/*.js    (paths, adjacency, checksum)
-//     → daily bank           public/daily/*.json + src/content/generated/daily-manifest.js
+//     → daily bank           public/daily/*.json + src/content/generated/daily-manifest.js (numbered No.1…N)
 //
 // `--check` regenerates everything in memory and fails if any committed file
 // differs, if a level's topology changed without a revision bump, or if a dated
@@ -18,7 +18,7 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { MAIN, STORIES, CHAPTER_ART } from '../levels/main.mjs';
-import { dailySpecs, FEATURED_COUNT } from '../levels/daily.mjs';
+import { dailySpecs, DAILY_EPOCH } from '../levels/daily.mjs';
 import { grid2x2, k4Disc, hexRing, bands, warpFn, combineMeshes, PAGE } from '../levels/shapes.mjs';
 import { voronoiPage, chordPage } from '../lib/mapgen.mjs';
 import { buildMesh, MeshError } from '../lib/mesh-build.mjs';
@@ -395,7 +395,7 @@ function buildLevel(spec, mode, index) {
             art,
             views: views.map(viewData),
         };
-        if (spec.date) level.date = spec.date;
+        if (spec.no) level.no = spec.no;
         level.checksum = levelChecksum(level);
         const master = {
             id: spec.id,
@@ -456,7 +456,7 @@ function levelReport(mainLevels, stories, daily, masters, dailyMasters) {
         if (c.twin) notes.push('两图同构');
         if (lv.views.length) notes.push('两种外形同构');
         if (c.cornerContacts) notes.push(`角点接触 ${c.cornerContacts}`);
-        const name = lv.mode === 'daily' ? lv.date : lv.name.zh;
+        const name = lv.mode === 'daily' ? `No.${lv.no}` : lv.name.zh;
         return `| ${lv.id} | ${name} | ${lv.adj.length} | ${c.chromatic} | ${clues} | ${pre} | ${sol} | ${c.difficulty.trapRate} | ${lv.tags[0]} | ${notes.join('；')} |`;
     };
     const head = '| ID | 名称 | 区域 | χ | 固定 | 预填 | 解数 | 陷阱率 | 难度 | 证书 |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |';
@@ -548,26 +548,23 @@ function main() {
         seen.set(sig, lv.id);
     }
 
-    // daily manifest: immutable once dated
-    const dailyLock = readJson('content/daily-lock.json', { entries: [] });
-    const lockedByDate = new Map(dailyLock.entries.map(e => [e.date, e]));
-    const manifestEntries = daily.map(lv => ({ date: lv.date, id: lv.id, revision: lv.revision, checksum: lv.checksum }));
-    for (const e of manifestEntries) {
-        const old = lockedByDate.get(e.date);
+    // daily manifest: numbered puzzles, immutable once released; the epoch is locked too
+    const dailyLock = readJson('content/daily-lock.json', { epoch: null, entries: [] });
+    const lockedByNo = new Map(dailyLock.entries.map(e => [e.no, e]));
+    const manifestEntries = daily.map(lv => ({ no: lv.no, id: lv.id, revision: lv.revision, checksum: lv.checksum }));
+    if (dailyLock.epoch && dailyLock.epoch !== DAILY_EPOCH) {
+        problems.push(`daily epoch is locked to ${dailyLock.epoch}; changing it to ${DAILY_EPOCH} would shift which number is “today” for every player`);
+    }
+    manifestEntries.forEach((e, i) => {
+        if (e.no !== i + 1) problems.push(`daily numbers must be consecutive from 1 (found No.${e.no} at position ${i + 1})`);
+        const old = lockedByNo.get(e.no);
         if (old && (old.id !== e.id || old.revision !== e.revision || old.checksum !== e.checksum)) {
-            problems.push(`daily ${e.date} is locked to ${old.id} r${old.revision} (${old.checksum}); generator now produced ${e.id} r${e.revision} (${e.checksum})`);
+            problems.push(`daily No.${e.no} is locked to ${old.id} r${old.revision} (${old.checksum}); generator now produced ${e.id} r${e.revision} (${e.checksum})`);
         }
-    }
+    });
     for (const old of dailyLock.entries) {
-        if (!manifestEntries.some(e => e.date === old.date)) problems.push(`daily ${old.date} disappeared from the manifest`);
+        if (!manifestEntries.some(e => e.no === old.no)) problems.push(`daily No.${old.no} disappeared from the manifest`);
     }
-    const featured = daily
-        .slice()
-        .sort((a, b) => b.tags.includes('tricky') - a.tags.includes('tricky') || a.id.localeCompare(b.id))
-        .filter((lv, i, arr) => arr.findIndex(o => o.chapter === lv.chapter && o.tags[0] === lv.tags[0]) === i || i % 3 === 0)
-        .slice(0, FEATURED_COUNT)
-        .map(lv => lv.id)
-        .sort();
 
     // write
     const byChapter = [1, 2, 3, 4].map(ch => mainLevels.filter(l => l.chapter === ch));
@@ -578,16 +575,16 @@ function main() {
         stories: stories.map(l => ({ id: l.id, revision: l.revision, chapter: l.chapter, index: l.index, name: l.name, regions: l.adj.length, tags: l.tags, checksum: l.checksum })),
     };
     emit('src/content/generated/index.js', moduleText('Level index: ids, names and checksums.', index));
-    emit('src/content/generated/daily-manifest.js', moduleText('UTC+8 date → daily puzzle. Immutable once dated (content/daily-lock.json).', {
-        version: 1,
+    emit('src/content/generated/daily-manifest.js', moduleText('Numbered daily puzzles. Today = UTC+8 days since epoch + 1. Immutable once released (content/daily-lock.json).', {
+        version: 2,
+        epoch: DAILY_EPOCH,
         entries: manifestEntries,
-        featured,
     }));
     for (const lv of daily) emit(`public/daily/${lv.id}.r${lv.revision}.json`, `${JSON.stringify(lv)}\n`);
     emit('docs/level-report.md', levelReport(mainLevels, stories, daily, masters, dailyMasters));
     emit('content/master/levels.json', `${JSON.stringify({ generator: 1, levels: masters })}\n`);
     emit('content/master/daily.json', `${JSON.stringify({ generator: 1, levels: dailyMasters })}\n`);
-    emit('content/daily-lock.json', `${JSON.stringify({ note: 'Dated daily entries are immutable. Append only.', entries: manifestEntries }, null, 1)}\n`);
+    emit('content/daily-lock.json', `${JSON.stringify({ note: 'Released daily numbers are immutable and the epoch never moves after launch. Append only.', epoch: DAILY_EPOCH, entries: manifestEntries }, null, 1)}\n`);
     emit('tools/levels/revisions.lock.json', `${JSON.stringify(nextLock, null, 1)}\n`);
 
     if (problems.length) {

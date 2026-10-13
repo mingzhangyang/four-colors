@@ -43,6 +43,9 @@ jobs:
       - name: First-screen JS budget (gzip ≤ 150 KB)
         run: node tools/checks/budget.mjs
 
+      - name: Cloudflare config dry run (deployment itself is done by Workers Builds)
+        run: npx wrangler deploy --dry-run --outdir .wrangler-dry-run
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 

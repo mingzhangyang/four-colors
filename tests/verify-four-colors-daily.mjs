@@ -1,7 +1,7 @@
-// Daily bank verifier: at least 60 reviewed puzzles on consecutive UTC+8
-// dates, an immutable dated manifest (content/daily-lock.json), files that
-// match their checksums, valid witnesses, no structural duplicates across the
-// whole game, and the UTC+8 date helpers at their boundaries.
+// Daily bank verifier: at least 60 reviewed puzzles numbered No.1…N, an
+// immutable released manifest (content/daily-lock.json, epoch included),
+// files that match their checksums, valid witnesses, no structural duplicates
+// across the whole game, and the UTC+8 "today's number" rule at its edges.
 
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
@@ -10,7 +10,8 @@ import { dirname, join } from 'node:path';
 import { test, run } from './lib/harness.mjs';
 import manifest from '../src/content/generated/daily-manifest.js';
 import { levelChecksum } from '../src/content/checksum.js';
-import { utc8Date, msUntilNextDay, dailyStatus, dailySessionPlan, featuredEntries, formatCountdown } from '../src/services/daily.js';
+import { utc8Date, msUntilNextDay, dailyStatus, dailySessionPlan, formatCountdown, dailyNumber, dateOfNumber, isReleased, archiveEntries } from '../src/services/daily.js';
+import { DAILY_EPOCH } from '../tools/levels/daily.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const lock = JSON.parse(readFileSync(join(ROOT, 'content/daily-lock.json'), 'utf8'));
@@ -20,25 +21,22 @@ const chapters = await Promise.all([1, 2, 3, 4].map(n => import(`../src/content/
 const STORIES = (await import('../src/content/generated/stories.js')).default;
 const E = -1;
 
-const nextDate = d => {
-    const [y, m, dd] = d.split('-').map(Number);
-    const t = new Date(Date.UTC(y, m - 1, dd + 1));
-    return t.toISOString().slice(0, 10);
-};
-
-test('at least 60 dailies on consecutive dates with unique ids', () => {
+test('at least 60 dailies numbered consecutively from No.1 with unique ids', () => {
     const entries = manifest.entries;
     assert.ok(entries.length >= 60, `${entries.length} dailies`);
-    for (let i = 1; i < entries.length; i++) assert.equal(entries[i].date, nextDate(entries[i - 1].date));
+    entries.forEach((e, i) => assert.equal(e.no, i + 1));
     assert.equal(new Set(entries.map(e => e.id)).size, entries.length);
+    assert.ok(entries.every(e => !('date' in e)), 'puzzles are not tied to calendar dates');
+    assert.equal(manifest.epoch, DAILY_EPOCH);
 });
 
-test('dated manifest is immutable: every locked entry is unchanged', () => {
+test('released numbers and the epoch are immutable', () => {
+    assert.equal(lock.epoch, manifest.epoch, 'epoch matches the lock');
     assert.ok(lock.entries.length >= 60);
     for (const old of lock.entries) {
-        const now = manifest.entries.find(e => e.date === old.date);
-        assert.ok(now, `${old.date} still dated`);
-        assert.deepEqual(now, old, `${old.date} unchanged`);
+        const now = manifest.entries.find(e => e.no === old.no);
+        assert.ok(now, `No.${old.no} still present`);
+        assert.deepEqual(now, old, `No.${old.no} unchanged`);
     }
 });
 
@@ -50,7 +48,8 @@ test('each daily file exists, matches the manifest and its checksum', () => {
         const lv = DAILY[i];
         assert.equal(lv.id, e.id);
         assert.equal(lv.revision, e.revision);
-        assert.equal(lv.date, e.date);
+        assert.equal(lv.no, e.no);
+        assert.equal(lv.date, undefined);
         assert.equal(lv.mode, 'daily');
         assert.equal(lv.checksum, e.checksum);
         assert.equal(levelChecksum(lv), lv.checksum);
@@ -86,36 +85,60 @@ test('no structural duplicates (re-skins) across dailies, main pages and stories
     }
 });
 
-test('featured picks exist and are dated entries', () => {
-    assert.equal(manifest.featured.length, 12);
-    assert.equal(featuredEntries(manifest).length, 12);
-});
-
-test('UTC+8 day boundaries', () => {
-    assert.equal(utc8Date(Date.parse('2026-10-12T15:59:59Z')), '2026-10-12');
-    assert.equal(utc8Date(Date.parse('2026-10-12T16:00:00Z')), '2026-10-13');
-    assert.equal(utc8Date(Date.parse('2026-12-31T16:30:00Z')), '2027-01-01');
-    assert.equal(msUntilNextDay(Date.parse('2026-10-12T15:59:00Z')), 60_000);
-    assert.equal(msUntilNextDay(Date.parse('2026-10-12T16:00:00Z')), 24 * 3600 * 1000);
+test('today’s number follows UTC+8 days since the epoch', () => {
+    const at = (date, time) => Date.parse(`${date}T${time}Z`);
+    assert.equal(utc8Date(at('2026-10-12', '15:59:59')), '2026-10-12');
+    assert.equal(utc8Date(at('2026-10-12', '16:00:00')), '2026-10-13');
+    assert.equal(utc8Date(at('2026-12-31', '16:30:00')), '2027-01-01');
+    assert.equal(msUntilNextDay(at('2026-10-12', '15:59:00')), 60_000);
+    assert.equal(msUntilNextDay(at('2026-10-12', '16:00:00')), 24 * 3600 * 1000);
     assert.equal(formatCountdown(3 * 3600 * 1000 + 5 * 60 * 1000), '3:05');
+    const m = { epoch: '2026-10-13', entries: manifest.entries };
+    assert.equal(dailyNumber(m, '2026-10-13'), 1);
+    assert.equal(dailyNumber(m, '2026-10-14'), 2);
+    assert.equal(dailyNumber(m, '2026-11-12'), 31);
+    assert.equal(dailyNumber(m, '2027-01-01'), 81, 'across a year boundary');
+    assert.equal(dateOfNumber(m, 31), '2026-11-12');
+    // the switch happens at midnight UTC+8 (16:00 UTC), not at local midnight
+    assert.equal(dailyNumber(m, utc8Date(at('2026-10-13', '15:59:59'))), 1);
+    assert.equal(dailyNumber(m, utc8Date(at('2026-10-13', '16:00:00'))), 2);
 });
 
-test('daily status: before start, today, expired', () => {
-    const first = manifest.entries[0].date;
-    const last = manifest.entries[manifest.entries.length - 1].date;
-    assert.equal(dailyStatus(manifest, first).state, 'today');
-    assert.equal(dailyStatus(manifest, '2020-01-01').state, 'before');
-    assert.equal(dailyStatus(manifest, nextDate(last)).state, 'expired');
+test('status before the epoch, during the bank and after it runs out', () => {
+    const m = manifest;
+    const last = m.entries.length;
+    assert.equal(dailyStatus(m, '2020-01-01').state, 'before');
+    const first = dailyStatus(m, m.epoch);
+    assert.equal(first.state, 'today');
+    assert.equal(first.entry.no, 1);
+    assert.equal(dailyStatus(m, dateOfNumber(m, last)).entry.no, last);
+    const after = dailyStatus(m, dateOfNumber(m, last + 1));
+    assert.equal(after.state, 'expired');
+    assert.equal(archiveEntries(m, dateOfNumber(m, last + 1)).length, last, 'every number stays playable after the bank runs out');
 });
 
-test('a session started before midnight stays locked to its puzzle', () => {
-    const [d1, d2] = manifest.entries;
-    const daily = { session: { date: d1.date, id: d1.id, revision: d1.revision }, records: {} };
-    const plan = dailySessionPlan(daily, manifest, d2.date);
-    assert.deepEqual(plan.unfinishedOld, daily.session, 'yesterday’s unfinished map is still offered');
+test('only released numbers can be opened; the archive lists earlier ones', () => {
+    const m = manifest;
+    const d5 = dateOfNumber(m, 5);
+    assert.ok(isReleased(m, d5, 5));
+    assert.ok(isReleased(m, d5, 1));
+    assert.ok(!isReleased(m, d5, 6), 'future numbers are not opened early');
+    assert.ok(!isReleased(m, d5, 0));
+    assert.deepEqual(archiveEntries(m, d5).map(e => e.no), [4, 3, 2, 1]);
+});
+
+test('a number opened before midnight stays the same puzzle afterwards', () => {
+    const m = manifest;
+    const [e1, e2] = m.entries;
+    const day1 = dateOfNumber(m, 1);
+    const day2 = dateOfNumber(m, 2);
+    const daily = { session: { date: day1, no: 1, id: e1.id, revision: e1.revision }, records: {} };
+    const plan = dailySessionPlan(daily, m, day2);
+    assert.deepEqual(plan.unfinishedOld, daily.session, 'yesterday’s unfinished No.1 is still offered');
     assert.equal(plan.newDay, true);
-    assert.equal(plan.status.entry.id, d2.id);
-    const done = dailySessionPlan({ ...daily, records: { [d1.date]: { completed: true } } }, manifest, d2.date);
+    assert.equal(plan.status.entry.id, e2.id);
+    assert.ok(isReleased(m, day2, 1), 'No.1 can still be finished on day two');
+    const done = dailySessionPlan({ ...daily, records: { [e1.id]: { completed: true } } }, m, day2);
     assert.equal(done.unfinishedOld, null);
 });
 
