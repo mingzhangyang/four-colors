@@ -10,6 +10,7 @@ import { dirname, join } from 'node:path';
 import { test, run } from './lib/harness.mjs';
 import manifest from '../src/content/generated/daily-manifest.js';
 import { levelChecksum } from '../src/content/checksum.js';
+import { borderPaths } from '../src/render/scenery.js';
 import { utc8Date, msUntilNextDay, dailyStatus, dailySessionPlan, formatCountdown, dailyNumber, dateOfNumber, isReleased, archiveEntries } from '../src/services/daily.js';
 import { DAILY_EPOCH } from '../tools/levels/daily.mjs';
 
@@ -74,6 +75,16 @@ function signature(lv) {
     for (let r = 0; r < 3; r++) col = col.map((c, i) => `${c}[${lv.adj[i].map(j => col[j]).sort().join(';')}]`);
     return `${n}:${col.slice().sort().join('|')}`;
 }
+
+test('daily borders preserve every compiled edge exactly once', () => {
+    // Daily maps, collection thumbnails and PNG exports all draw borderPaths.
+    const parts = d => (d.match(/M[^M]+/g) || []).map(s => s.trim()).sort();
+    for (const lv of DAILY) for (const view of [lv, ...(lv.views || [])]) {
+        const { inner, outer } = borderPaths(view);
+        assert.ok(outer, `${lv.id} has an outer border`);
+        assert.deepEqual(parts(`${inner} ${outer}`), parts(view.outline), `${lv.id} edge partition`);
+    }
+});
 
 test('no structural duplicates (re-skins) across dailies, main pages and stories', () => {
     const all = [...DAILY, ...chapters.flat(), ...STORIES];
