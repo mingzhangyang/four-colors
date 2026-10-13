@@ -505,9 +505,9 @@ await scenario('daily: a failed download offers a retry instead of breaking the 
     await page.waitForSelector('.toast .toast-actions', { timeout: 5000 });
     assert.match(await page.locator('.toast').textContent(), /暂时无法载入/);
     srv.server.failDaily = false;
-    await page.click('.toast .btn-primary');
-    await page.evaluate(() => { location.hash = '#/daily'; });
+    await page.click('.toast .btn-primary'); // Retry alone must refetch and open the daily
     await waitPlay(page, manifest.entries[3].id);
+    assert.equal(new URL(page.url()).hash, '#/daily/4');
     await ctx.close();
 });
 

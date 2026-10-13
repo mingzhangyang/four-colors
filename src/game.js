@@ -318,14 +318,19 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
     window.addEventListener('pagehide', () => { if (saveTimer) flushSave(); });
 
     // ───────────────────────── settings ─────────────────────────
+    function applyTheme() {
+        const theme = settings.resolvedTheme();
+        document.documentElement.dataset.theme = theme;
+        // browser chrome follows the page theme, not only the system scheme
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', theme === 'dark' ? '#1b1c1e' : '#f4ecdd');
+    }
+
     function applySettings() {
         setLang(settings.get('lang'));
-        document.documentElement.dataset.theme = settings.resolvedTheme();
+        applyTheme();
         document.documentElement.classList.toggle('reduce-motion', settings.reducedMotion());
         document.documentElement.classList.toggle('motion-full', settings.get('motion') === 'full');
-        const meta = document.querySelector('meta[name="theme-color"]:not([media])') || null;
-        if (meta) meta.setAttribute('content', settings.resolvedTheme() === 'dark' ? '#1b1c1e' : '#f4ecdd');
-        audio.setMuted(settings.get('muted'));
         refreshChrome();
     }
 
@@ -337,7 +342,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
             if (view === 'play') { refreshPlayLabels(); renderPlay(); }
             if (view === 'full') openFull();
         }
-        if (key === 'theme') document.documentElement.dataset.theme = settings.resolvedTheme();
+        if (key === 'theme') applyTheme();
         if (key === 'motion') {
             document.documentElement.classList.toggle('reduce-motion', settings.reducedMotion());
             document.documentElement.classList.toggle('motion-full', settings.get('motion') === 'full');
@@ -531,7 +536,8 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
                 level = await loadDaily(entry);
             } catch {
                 if (token !== routeToken) return;
-                toasts.show('daily', t('daily.loadFailed'), { actions: [{ label: t('daily.retry'), primary: true, run: () => route(true) }] });
+                // retry returns to this numbered daily, which issues a fresh request
+                toasts.show('daily', t('daily.loadFailed'), { actions: [{ label: t('daily.retry'), primary: true, run: () => { location.hash = `#/daily/${no}`; } }] });
                 location.hash = '#/atlas/daily';
                 return;
             }

@@ -133,6 +133,7 @@ export function compileMesh(mesh, opts = {}) {
             }
         }
     });
+    const isEnd = (ei, v) => v === edges[ei].v[0] || v === edges[ei].v[edges[ei].v.length - 1];
     const checked = new Set();
     let crossings = 0;
     for (const bucket of grid.values()) {
@@ -151,8 +152,18 @@ export function compileMesh(mesh, opts = {}) {
                 const C = vertices[t.p];
                 const D = vertices[t.q];
                 if (shared) {
-                    // sharing an end is fine unless the segments fold back onto each other
                     const sharedId = s.p === t.p || s.p === t.q ? s.p : s.q;
+                    // a junction joins logical edges at both of their ends; a vertex inside an
+                    // edge is shared only by that edge's neighbouring segment, otherwise two
+                    // boundaries cross or touch there under a reused vertex id
+                    const junction = s.ei === t.ei
+                        ? Math.abs(s.i - t.i) === 1 || isEnd(s.ei, sharedId)
+                        : isEnd(s.ei, sharedId) && isEnd(t.ei, sharedId);
+                    if (!junction) {
+                        if (crossings++ < 6) err(`edges ${s.ei} and ${t.ei} meet inside an edge at vertex ${sharedId}`);
+                        continue;
+                    }
+                    // sharing an end is fine unless the segments fold back onto each other
                     const far1 = sharedId === s.p ? B : A;
                     const far2 = sharedId === t.p ? D : C;
                     const o = vertices[sharedId];

@@ -98,6 +98,15 @@ const isId = v => typeof v === 'string' && /^[A-Z][A-Z0-9]{0,8}$/.test(v);
 const isDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const isRev = v => Number.isInteger(v) && v >= 1 && v < 1000;
 
+/** Write header of a stored snapshot, normalised exactly as `validateSnapshot` adopts it. */
+function headerOf(raw) {
+    if (!isObj(raw) || raw.schema !== SNAPSHOT_SCHEMA) return { writeSeq: 0, writer: null };
+    return {
+        writeSeq: Number.isInteger(raw.writeSeq) && raw.writeSeq >= 0 ? raw.writeSeq : 0,
+        writer: typeof raw.writer === 'string' ? raw.writer.slice(0, 40) : null,
+    };
+}
+
 export function sessionKey(id, revision) {
     return `${id}@${revision}`;
 }
@@ -110,8 +119,7 @@ export function sessionKey(id, revision) {
 export function validateSnapshot(raw) {
     const snap = emptySnapshot();
     if (!isObj(raw) || raw.schema !== SNAPSHOT_SCHEMA) return snap;
-    snap.writeSeq = Number.isInteger(raw.writeSeq) && raw.writeSeq >= 0 ? raw.writeSeq : 0;
-    snap.writer = typeof raw.writer === 'string' ? raw.writer.slice(0, 40) : null;
+    ({ writeSeq: snap.writeSeq, writer: snap.writer } = headerOf(raw));
     snap.savedAt = Number.isFinite(raw.savedAt) ? raw.savedAt : 0;
     snap.visited = raw.visited === true;
     if (isObj(raw.current) && ['main', 'story', 'daily', 'collect'].includes(raw.current.kind)
@@ -172,9 +180,16 @@ export function validateSnapshot(raw) {
 }
 
 /**
- * Save manager with a write-version check: another tab's newer snapshot is
- * never silently overwritten. On conflict, `save` refuses and reports it; the
- * caller asks the player whether to load the other progress or keep this tab.
+ * Save manager with a write-version check: another tab's snapshot is never
+ * silently overwritten. On conflict, `save` refuses and reports it; the caller
+ * asks the player whether to load the other progress or keep this tab.
+ *
+ * localStorage has no compare-and-set, so two tabs can still both pass the
+ * check and write moments apart. The header (writeSeq + writer) makes that
+ * race visible instead of silent: whichever tab was overwritten now finds a
+ * stored header it neither wrote nor loaded — even with an equal or lower
+ * sequence — and reports a conflict on the `storage` event or its next save,
+ * while its own progress is still in memory.
  */
 export function createSaveManager({ storage, tabId, slot = 'save' }) {
     let seenSeq = 0;
@@ -188,12 +203,13 @@ export function createSaveManager({ storage, tabId, slot = 'save' }) {
         },
         /** Peek at the stored header without adopting it. */
         peek() {
-            const raw = storage.get(slot, null);
-            return isObj(raw) ? { writeSeq: Number(raw.writeSeq) || 0, writer: raw.writer || null } : { writeSeq: 0, writer: null };
+            return headerOf(storage.get(slot, null));
         },
+        /** True when the stored snapshot is not the one this tab last loaded or wrote. */
         hasConflict() {
             const head = this.peek();
-            return head.writeSeq > seenSeq && head.writer !== tabId;
+            if (head.writer === tabId) return false;
+            return head.writeSeq !== seenSeq || head.writer !== seenWriter;
         },
         save(snapshot, { force = false } = {}) {
             if (!storage.available) return { ok: false, reason: 'unavailable' };

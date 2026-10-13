@@ -37,8 +37,6 @@ function swapHint(puzzle, colors, layer) {
     const open = targets.filter(([i, c]) => colors[i] !== c);
     if (!open.length) return hint(layer, 'hint.swapDone', {});
     const locked = puzzle.fixed.map(c => c !== EMPTY);
-    const isGoal = s => targets.every(([i, c]) => s[i] === c);
-    const bfs = shortestSwapPath(puzzle.adj, colors, { locked, isGoal, maxStates: 60_000 });
     const [t, tc] = open[0];
     if (layer === 1) return hint(1, 'hint.swapLook', { region: R(t) }, { regions: [t] });
     if (layer === 2) {
@@ -47,6 +45,9 @@ function swapHint(puzzle, colors, layer) {
         return hint(2, lockedIn.length ? 'hint.swapLocked' : 'hint.swapFree', { region: R(t), a: C(colors[t]), b: C(tc) },
             { regions: comp });
     }
+    // the bounded search is only needed for the concrete step
+    const isGoal = s => targets.every(([i, c]) => s[i] === c);
+    const bfs = shortestSwapPath(puzzle.adj, colors, { locked, isGoal, maxStates: 60_000 });
     if (!bfs.found) return hint(layer, 'hint.unavailable', {});
     const mv = bfs.path[0];
     const comp = kempeComponent(puzzle.adj, colors, mv.region, mv.a, mv.b);

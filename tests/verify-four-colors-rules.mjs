@@ -106,6 +106,14 @@ test('compiler rejects zero-length and non-manifold edges and cracks', () => {
     assert.equal(c.errors.length, 0);
 });
 
+test('compiler rejects boundaries that cross under a reused vertex id', () => {
+    // two overlapping squares whose outlines both pass through the crossing points 2 and 4
+    const vertices = [[0, 0], [100, 0], [100, 40], [100, 100], [60, 100], [0, 100], [60, 40], [160, 40], [160, 140], [60, 140]];
+    const edges = [{ v: [0, 1, 2, 3, 4, 5, 0], a: 0, b: -1 }, { v: [6, 2, 7, 8, 9, 4, 6], a: 1, b: -1 }];
+    const c = compileMesh({ vertices, edges, rings: [[0], [1]] });
+    assert.ok(c.errors.some(e => /meet inside an edge/.test(e)), c.errors.join('\n'));
+});
+
 test('compiler enforces minimum shared border and inscribed radius', () => {
     const c = compile(k4Disc(), { minInradius: 500 });
     assert.ok(c.errors.some(e => /inscribed radius/.test(e)));
@@ -411,6 +419,34 @@ test('multi-tab: a newer write from another tab is never silently overwritten', 
     assert.equal(reloaded.writer, 'B');
 });
 
+test('multi-tab: a write that races past the check is reported to the overwritten tab', () => {
+    const backend = memoryBackend();
+    const storage = createStorage({ backend });
+    const b = createSaveManager({ storage, tabId: 'B' });
+    // A passes its check, then B writes before A's write lands (no compare-and-set in localStorage)
+    let raced = false;
+    const racing = { ...storage, trySet(slot, value) {
+        if (!raced) { raced = true; assert.equal(b.save({ ...sb, lastTab: 'b' }).ok, true); }
+        return storage.trySet(slot, value);
+    } };
+    const a = createSaveManager({ storage: racing, tabId: 'A' });
+    const sa = a.load();
+    const sb = b.load();
+    assert.equal(a.save({ ...sa, lastTab: 'a' }).ok, true);
+    const stored = JSON.parse(backend.getItem(storageKey('save')));
+    assert.equal(stored.writer, 'A');
+    assert.equal(stored.writeSeq, b.seen.seq, 'both tabs wrote the same sequence number');
+    assert.equal(a.hasConflict(), false);
+    assert.equal(b.hasConflict(), true, 'B sees a header it neither wrote nor loaded');
+    assert.deepEqual(b.save({ ...sb, lastTab: 'b' }), { ok: false, reason: 'conflict' });
+    // a foreign header with a lower sequence is a conflict too; an untouched one is not
+    backend.setItem(storageKey('save'), JSON.stringify({ ...emptySnapshot(), writeSeq: 0, writer: 'C' }));
+    assert.equal(a.hasConflict(), true);
+    const fresh = createSaveManager({ storage, tabId: 'D' });
+    fresh.load();
+    assert.equal(fresh.hasConflict(), false);
+});
+
 // ── settings ──
 test('entry settings: stored preference > URL parameter > browser', () => {
     const r1 = resolveEntry({ stored: { lang: 'zh' }, search: '?lang=en&theme=dark&p=FC08', browserLang: 'en-US', systemDark: false });
@@ -444,10 +480,14 @@ test('hint service: tagged replies, timeout and cancellation never touch state',
     const pending = svc.request({ sessionId: 1, puzzleRevision: 1, stateRevision: 6, puzzle: puzzle(PATH4), colors: [0, -1, -1, -1], layer: 1 });
     svc.cancelAll();
     assert.equal((await pending).cancelled, true);
-    // no Worker at all: computed asynchronously with the same tags
+    // no Worker at all: reported unavailable with the same tags, never solved on the page
     const svc3 = createHintService({ timeoutMs: 500, workerFactory: () => { throw new Error('no worker'); } });
     const r3 = await svc3.request({ sessionId: 4, puzzleRevision: 1, stateRevision: 1, puzzle: puzzle(PATH4), colors: [0, 0, -1, -1], layer: 1 });
-    assert.equal(r3.result.key, 'hint.lookConflict');
+    assert.equal(r3.unavailable, true);
+    assert.equal(r3.result, null);
+    assert.equal(r3.sessionId, 4);
+    assert.equal(r3.stateRevision, 1);
+    assert.equal(svc3.pendingCount, 0);
 });
 
 await run('verify-four-colors-rules');

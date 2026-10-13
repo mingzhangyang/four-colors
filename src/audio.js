@@ -1,6 +1,8 @@
 // Synthesised paper, stamp and completion sounds. Muted by default with this
-// game's own setting; the AudioContext is only created inside a user gesture
-// (the unmute action), never on page load, and nothing is shared across sites.
+// game's own setting. A stored "unmuted" preference is only hydrated at
+// construction; the AudioContext is created inside a user gesture (the unmute
+// action or the first sound a player action plays), never on page load, and
+// nothing is shared across sites.
 
 export function createAudio({ muted = true } = {}) {
     let ctx = null;

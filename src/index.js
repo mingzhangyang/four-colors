@@ -16,7 +16,8 @@ const storage = createStorage();
 const settings = createSettings({ storage });
 const tabId = makeTabId();
 const saves = createSaveManager({ storage, tabId });
-const audio = createAudio({ muted: true });
+// the stored preference is only hydrated here; no AudioContext exists until a gesture
+const audio = createAudio({ muted: settings.get('muted') });
 const hints = createHintService();
 
 const game = createGame({

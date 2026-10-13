@@ -6,8 +6,7 @@
     <title>四色图志 Fourfold Atlas</title>
     <meta name="description" content="用四种颜色修复一部失色地图册：相邻区域不同色，在边界之间寻找协调的秩序。A calm four-color map puzzle: restore a faded atlas so that no two neighbouring regions share a color.">
     <link rel="canonical" href="https://four-colors.orangely.xyz/">
-    <meta name="theme-color" content="#f4ecdd" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#1b1c1e" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#f4ecdd">
     <meta name="color-scheme" content="light dark">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="四色图志 Fourfold Atlas">
@@ -34,6 +33,8 @@
                 : (q.get('lang') === 'en' || q.get('lang') === 'zh' ? q.get('lang')
                     : ((navigator.language || '').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en'));
             document.documentElement.setAttribute('data-theme', theme);
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', theme === 'dark' ? '#1b1c1e' : '#f4ecdd');
             document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
         })();
     </script>
