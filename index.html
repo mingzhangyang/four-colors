@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>四色图志 Fourfold Atlas</title>
+    <meta name="description" content="用四种颜色修复一部失色地图册：相邻区域不同色，在边界之间寻找协调的秩序。A calm four-color map puzzle: restore a faded atlas so that no two neighbouring regions share a color.">
+    <link rel="canonical" href="https://four-colors.orangely.xyz/">
+    <meta name="theme-color" content="#f4ecdd">
+    <meta name="color-scheme" content="light dark">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="四色图志 Fourfold Atlas">
+    <meta property="og:title" content="四色图志 Fourfold Atlas">
+    <meta property="og:description" content="用四种颜色修复一部失色地图册。Restore a faded atlas with four colors.">
+    <meta property="og:url" content="https://four-colors.orangely.xyz/">
+    <meta property="og:image" content="https://four-colors.orangely.xyz/og.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <script>
+        // First paint: resolve theme and language before CSS applies (stored > URL > system).
+        (function () {
+            var s = {};
+            try { s = JSON.parse(localStorage.getItem('game:four-colors:v1:settings') || '{}') || {}; } catch (e) { s = {}; }
+            var q = new URLSearchParams(location.search);
+            var theme = ['light', 'dark', 'system'].indexOf(s.theme) >= 0 ? s.theme
+                : (['light', 'dark', 'system'].indexOf(q.get('theme')) >= 0 ? q.get('theme') : 'system');
+            if (theme === 'system') theme = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            var lang = s.lang === 'en' || s.lang === 'zh' ? s.lang
+                : (q.get('lang') === 'en' || q.get('lang') === 'zh' ? q.get('lang')
+                    : ((navigator.language || '').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en'));
+            document.documentElement.setAttribute('data-theme', theme);
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', theme === 'dark' ? '#1b1c1e' : '#f4ecdd');
+            document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+        })();
+    </script>
+    <link rel="stylesheet" href="/src/styles/main.css">
+</head>
+<body>
+    <div id="app" class="app" aria-busy="true">
+        <div class="boot" role="status">
+            <svg class="boot-mark" viewBox="0 0 240 240" aria-hidden="true"><path d="M120 120L120 20A100 100 0 0 1 206.6 170Z" fill="#c9654f"/><path d="M120 120L206.6 170A100 100 0 0 1 33.4 170Z" fill="#ddb858"/><path d="M120 120L33.4 170A100 100 0 0 1 120 20Z" fill="#4c8b86"/><circle cx="120" cy="120" r="38" fill="#6a6eab"/></svg>
+            <span class="boot-text">四色图志 · Fourfold Atlas</span>
+        </div>
+    </div>
+    <noscript>
+        <p class="noscript">四色图志需要启用 JavaScript。Fourfold Atlas needs JavaScript to run.</p>
+    </noscript>
+    <script type="module" src="/src/index.js"></script>
+</body>
+</html>

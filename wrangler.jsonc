@@ -1,0 +1,19 @@
+// Cloudflare deployment: Workers static assets only (no server code).
+// Deployed automatically by Cloudflare Workers Builds from this GitHub repo
+// (see docs/deploy.md). The Worker name must match the Workers Builds project.
+{
+	"name": "four-colors",
+	"compatibility_date": "2026-09-01",
+	"assets": {
+		"directory": "./dist",
+		"not_found_handling": "404-page"
+	},
+	"routes": [
+		{
+			"pattern": "four-colors.orangely.xyz",
+			"custom_domain": true
+		}
+	],
+	"workers_dev": false,
+	"preview_urls": true
+}

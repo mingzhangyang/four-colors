@@ -1,0 +1,366 @@
+{
+ "note": "Released daily numbers are immutable and the epoch never moves after launch. Append only.",
+ "epoch": "2026-10-13",
+ "entries": [
+  {
+   "no": 1,
+   "id": "D001",
+   "revision": 1,
+   "checksum": "fa52c87c"
+  },
+  {
+   "no": 2,
+   "id": "D002",
+   "revision": 1,
+   "checksum": "091f412a"
+  },
+  {
+   "no": 3,
+   "id": "D003",
+   "revision": 1,
+   "checksum": "cc2a96eb"
+  },
+  {
+   "no": 4,
+   "id": "D004",
+   "revision": 1,
+   "checksum": "8d22fb25"
+  },
+  {
+   "no": 5,
+   "id": "D005",
+   "revision": 1,
+   "checksum": "86c33a5b"
+  },
+  {
+   "no": 6,
+   "id": "D006",
+   "revision": 1,
+   "checksum": "f9ee616d"
+  },
+  {
+   "no": 7,
+   "id": "D007",
+   "revision": 1,
+   "checksum": "76d85202"
+  },
+  {
+   "no": 8,
+   "id": "D008",
+   "revision": 1,
+   "checksum": "750117d3"
+  },
+  {
+   "no": 9,
+   "id": "D009",
+   "revision": 1,
+   "checksum": "abef55b6"
+  },
+  {
+   "no": 10,
+   "id": "D010",
+   "revision": 1,
+   "checksum": "fa962cca"
+  },
+  {
+   "no": 11,
+   "id": "D011",
+   "revision": 1,
+   "checksum": "96135494"
+  },
+  {
+   "no": 12,
+   "id": "D012",
+   "revision": 1,
+   "checksum": "01681466"
+  },
+  {
+   "no": 13,
+   "id": "D013",
+   "revision": 1,
+   "checksum": "7bdb5fe9"
+  },
+  {
+   "no": 14,
+   "id": "D014",
+   "revision": 1,
+   "checksum": "fe6c03b5"
+  },
+  {
+   "no": 15,
+   "id": "D015",
+   "revision": 1,
+   "checksum": "54fac45e"
+  },
+  {
+   "no": 16,
+   "id": "D016",
+   "revision": 1,
+   "checksum": "754d9cb9"
+  },
+  {
+   "no": 17,
+   "id": "D017",
+   "revision": 1,
+   "checksum": "620c4d93"
+  },
+  {
+   "no": 18,
+   "id": "D018",
+   "revision": 1,
+   "checksum": "dc72b212"
+  },
+  {
+   "no": 19,
+   "id": "D019",
+   "revision": 1,
+   "checksum": "adc40b17"
+  },
+  {
+   "no": 20,
+   "id": "D020",
+   "revision": 1,
+   "checksum": "413dbec1"
+  },
+  {
+   "no": 21,
+   "id": "D021",
+   "revision": 1,
+   "checksum": "a61a8d47"
+  },
+  {
+   "no": 22,
+   "id": "D022",
+   "revision": 1,
+   "checksum": "51a2fccf"
+  },
+  {
+   "no": 23,
+   "id": "D023",
+   "revision": 1,
+   "checksum": "1d717c97"
+  },
+  {
+   "no": 24,
+   "id": "D024",
+   "revision": 1,
+   "checksum": "558bf30b"
+  },
+  {
+   "no": 25,
+   "id": "D025",
+   "revision": 1,
+   "checksum": "767de76e"
+  },
+  {
+   "no": 26,
+   "id": "D026",
+   "revision": 1,
+   "checksum": "407422ac"
+  },
+  {
+   "no": 27,
+   "id": "D027",
+   "revision": 1,
+   "checksum": "d3a39a35"
+  },
+  {
+   "no": 28,
+   "id": "D028",
+   "revision": 1,
+   "checksum": "f7f031f8"
+  },
+  {
+   "no": 29,
+   "id": "D029",
+   "revision": 1,
+   "checksum": "60b4121c"
+  },
+  {
+   "no": 30,
+   "id": "D030",
+   "revision": 1,
+   "checksum": "94d5e0c9"
+  },
+  {
+   "no": 31,
+   "id": "D031",
+   "revision": 1,
+   "checksum": "3e96d154"
+  },
+  {
+   "no": 32,
+   "id": "D032",
+   "revision": 1,
+   "checksum": "ad8a1125"
+  },
+  {
+   "no": 33,
+   "id": "D033",
+   "revision": 1,
+   "checksum": "3e6a03ac"
+  },
+  {
+   "no": 34,
+   "id": "D034",
+   "revision": 1,
+   "checksum": "d7fe883e"
+  },
+  {
+   "no": 35,
+   "id": "D035",
+   "revision": 1,
+   "checksum": "90e9ffc2"
+  },
+  {
+   "no": 36,
+   "id": "D036",
+   "revision": 1,
+   "checksum": "c59c6ba9"
+  },
+  {
+   "no": 37,
+   "id": "D037",
+   "revision": 1,
+   "checksum": "206620ed"
+  },
+  {
+   "no": 38,
+   "id": "D038",
+   "revision": 1,
+   "checksum": "cdfbb384"
+  },
+  {
+   "no": 39,
+   "id": "D039",
+   "revision": 1,
+   "checksum": "d56c0556"
+  },
+  {
+   "no": 40,
+   "id": "D040",
+   "revision": 1,
+   "checksum": "cbddf363"
+  },
+  {
+   "no": 41,
+   "id": "D041",
+   "revision": 1,
+   "checksum": "3c962d3e"
+  },
+  {
+   "no": 42,
+   "id": "D042",
+   "revision": 1,
+   "checksum": "40bef5f7"
+  },
+  {
+   "no": 43,
+   "id": "D043",
+   "revision": 1,
+   "checksum": "c80ae1a0"
+  },
+  {
+   "no": 44,
+   "id": "D044",
+   "revision": 1,
+   "checksum": "880eaec4"
+  },
+  {
+   "no": 45,
+   "id": "D045",
+   "revision": 1,
+   "checksum": "b83ee2be"
+  },
+  {
+   "no": 46,
+   "id": "D046",
+   "revision": 1,
+   "checksum": "5462d6b1"
+  },
+  {
+   "no": 47,
+   "id": "D047",
+   "revision": 1,
+   "checksum": "0314e115"
+  },
+  {
+   "no": 48,
+   "id": "D048",
+   "revision": 1,
+   "checksum": "a01f6e09"
+  },
+  {
+   "no": 49,
+   "id": "D049",
+   "revision": 1,
+   "checksum": "92291aa6"
+  },
+  {
+   "no": 50,
+   "id": "D050",
+   "revision": 1,
+   "checksum": "8adf4188"
+  },
+  {
+   "no": 51,
+   "id": "D051",
+   "revision": 1,
+   "checksum": "6b5ad972"
+  },
+  {
+   "no": 52,
+   "id": "D052",
+   "revision": 1,
+   "checksum": "191b736f"
+  },
+  {
+   "no": 53,
+   "id": "D053",
+   "revision": 1,
+   "checksum": "eae0c62b"
+  },
+  {
+   "no": 54,
+   "id": "D054",
+   "revision": 1,
+   "checksum": "11772612"
+  },
+  {
+   "no": 55,
+   "id": "D055",
+   "revision": 1,
+   "checksum": "2e268284"
+  },
+  {
+   "no": 56,
+   "id": "D056",
+   "revision": 1,
+   "checksum": "2f51c616"
+  },
+  {
+   "no": 57,
+   "id": "D057",
+   "revision": 1,
+   "checksum": "aa47dc8a"
+  },
+  {
+   "no": 58,
+   "id": "D058",
+   "revision": 1,
+   "checksum": "f03c9dab"
+  },
+  {
+   "no": 59,
+   "id": "D059",
+   "revision": 1,
+   "checksum": "3c435ec0"
+  },
+  {
+   "no": 60,
+   "id": "D060",
+   "revision": 1,
+   "checksum": "cf090d69"
+  }
+ ]
+}

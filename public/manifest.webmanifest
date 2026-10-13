@@ -1,0 +1,14 @@
+{
+  "name": "四色图志 Fourfold Atlas",
+  "short_name": "四色图志",
+  "description": "用四种颜色修复一部失色地图册。Restore a faded atlas with four colors.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#e8decb",
+  "theme_color": "#f4ecdd",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
