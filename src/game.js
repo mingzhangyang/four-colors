@@ -4,7 +4,7 @@
 
 import { t, tx, setLang, getLang, colorWithPattern, listJoin } from './i18n.js';
 import {
-    index, manifest, loadLevel, loadChapter, loadStories, nextMainId, loadDaily,
+    index, manifest, loadLevel, loadChapter, loadStories, nextMainId, loadDaily, dailyEntryById,
 } from './content/levels.js';
 import { chapterById, paletteFor } from './content/chapters.js';
 import { EMPTY, evaluate } from './model/rules.js';
@@ -70,7 +70,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
         storyLock: id => storyLock(id),
         loadChapter,
         loadStories,
-        loadAny: id => loadLevel(id),
+        loadAny: id => loadArtworkLevel(id),
         palette: ch => paletteFor(ch, settings.get('skin')),
         previewColors: lv => previewColorsFor(lv),
         dailyInfo: () => dailyInfo(),
@@ -294,7 +294,15 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
         if (toasts.has('conflict')) return;
         toasts.show('conflict', t('toast.conflict'), {
             actions: [
-                { label: t('toast.conflictLoad'), primary: true, run: () => { snap = saves.load(); route(true); } },
+                { label: t('toast.conflictLoad'), primary: true, run: () => {
+                    // Discard the old session before adopting the other tab's snapshot.
+                    // Ordinary navigation flushes pending edits; replacement must not.
+                    clearTimeout(saveTimer);
+                    saveTimer = null;
+                    leavePlay();
+                    snap = saves.load();
+                    route(true);
+                } },
                 { label: t('toast.conflictKeep'), run: () => flushSave({ force: true }) },
             ],
         });
@@ -511,6 +519,13 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
     }
 
     // ───────────────────────── opening pages ─────────────────────────
+    async function loadArtworkLevel(id) {
+        const daily = dailyEntryById(id);
+        if (!daily) return loadLevel(id);
+        if (!isReleased(manifest, utc8Date(now()), daily.no)) return null;
+        return loadDaily(daily);
+    }
+
     async function openPlay(r, token, force) {
         let level;
         const kind = r.kind;
@@ -541,11 +556,15 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
             if (r.uid) {
                 collectItem = snap.collection.find(c => c.uid === r.uid);
                 if (!collectItem) { location.hash = '#/atlas/collection'; return; }
-                level = await loadLevel(collectItem.id) || null;
+                level = await loadArtworkLevel(collectItem.id) || null;
                 if (!level || level.revision !== collectItem.revision) { location.hash = '#/atlas/collection'; return; }
             } else {
-                level = await loadLevel(r.id);
-                if (!level || !isDone(level.id)) { location.hash = level ? `#/p/${level.id}` : '#/'; return; }
+                level = await loadArtworkLevel(r.id);
+                if (!level || !isDone(level.id)) {
+                    location.hash = !level ? '#/' : level.mode === 'daily' ? `#/daily/${level.no}`
+                        : level.mode === 'story' ? `#/s/${level.id}` : `#/p/${level.id}`;
+                    return;
+                }
             }
         }
         if (token !== routeToken) return;
@@ -805,7 +824,6 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
         const collect = el('a', { class: 'btn', href: `#/collect/${p.level.id}` }, [icon('palette'), t('complete.collect')]);
         const share = el('button', { type: 'button', class: 'btn', onclick: () => shareLevel() }, [icon('share'), t('complete.share')]);
         completeBar.append(stay, collect, share, next);
-        if (p.level.mode === 'daily') collect.hidden = true;
     }
 
     function buildCollectBar() {
@@ -1218,8 +1236,13 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
     }
 
     async function exportCollectionItem(item) {
-        const lv = await loadLevel(item.id);
-        if (lv && lv.revision === item.revision) exportColors(lv, item.colors, item.texture);
+        try {
+            const lv = await loadArtworkLevel(item.id);
+            if (lv && lv.revision === item.revision) await exportColors(lv, item.colors, item.texture);
+            else toasts.show('export', t('export.failed'));
+        } catch {
+            toasts.show('export', t('export.failed'));
+        }
     }
 
     function deleteCollectionItem(item) {

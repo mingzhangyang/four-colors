@@ -57,7 +57,8 @@ function swapHint(puzzle, colors, layer) {
 export function computeHint(puzzle, colors, layer = 1) {
     layer = Math.max(1, Math.min(3, layer));
     if (swapOnly(puzzle)) return swapHint(puzzle, colors, layer);
-    const k = (puzzle.goals && puzzle.goals.maxColors) || COLOR_COUNT;
+    const k = COLOR_COUNT;
+    const maxColors = (puzzle.goals && puzzle.goals.maxColors) || COLOR_COUNT;
     const adj = puzzle.adj;
     const n = adj.length;
 
@@ -68,7 +69,7 @@ export function computeHint(puzzle, colors, layer = 1) {
         if (layer === 1) return hint(1, 'hint.lookConflict', {}, { pairs: [[a, b]] });
         if (layer === 2) return hint(2, 'hint.conflictRule', { a: R(a), b: R(b) }, { regions: [a, b], pairs: [[a, b]] });
         const soft = colors.slice();
-        const near = nearestSolution(adj, soft, { k, fixed: puzzle.fixed, nodeLimit: BUDGET });
+        const near = nearestSolution(adj, soft, { k, maxColors, fixed: puzzle.fixed, nodeLimit: BUDGET });
         if (!near.solution) return hint(3, 'hint.unavailable', {});
         const pick = [a, b].find(i => puzzle.fixed[i] === EMPTY && near.solution[i] !== colors[i])
             ?? [a, b].find(i => puzzle.fixed[i] === EMPTY);
@@ -78,19 +79,19 @@ export function computeHint(puzzle, colors, layer = 1) {
 
     // 2) too many colors on a fewer-colors page
     const used = colorsUsed(colors);
-    if (used.count > k) {
-        const near = nearestSolution(adj, colors, { k, fixed: puzzle.fixed, nodeLimit: BUDGET });
+    if (used.count > maxColors) {
+        const near = nearestSolution(adj, colors, { k, maxColors, fixed: puzzle.fixed, nodeLimit: BUDGET });
         const changed = near.solution ? colors.map((c, i) => (c !== EMPTY && c !== near.solution[i] ? i : -1)).filter(i => i >= 0) : [];
-        if (layer < 3 || !near.solution || !changed.length) return hint(Math.min(layer, 2), 'hint.tooMany', { max: k }, { regions: changed });
+        if (layer < 3 || !near.solution || !changed.length) return hint(Math.min(layer, 2), 'hint.tooMany', { max: maxColors }, { regions: changed });
         const r = changed[0];
         return hint(3, 'hint.recolor', { region: R(r), color: C(near.solution[r]) }, { regions: [r], suggestion: { type: 'fill', region: r, color: near.solution[r] } });
     }
 
-    const ext = isExtendable(adj, colors, { k, nodeLimit: BUDGET });
+    const ext = isExtendable(adj, colors, { k, maxColors, nodeLimit: BUDGET });
     if (!ext.known) return hint(layer, 'hint.unavailable', {});
 
     if (ext.extendable) {
-        const viable = viableCandidates(adj, colors, { k, nodeLimit: BUDGET });
+        const viable = viableCandidates(adj, colors, { k, maxColors, nodeLimit: BUDGET });
         if (!viable) return hint(layer, 'hint.unavailable', {});
         let best = -1;
         let bestCount = 99;
@@ -120,7 +121,7 @@ export function computeHint(puzzle, colors, layer = 1) {
     }
 
     // 3) painted layout cannot be extended: look back, not "the map is unsolvable"
-    const near = nearestSolution(adj, colors, { k, fixed: puzzle.fixed, nodeLimit: BUDGET });
+    const near = nearestSolution(adj, colors, { k, maxColors, fixed: puzzle.fixed, nodeLimit: BUDGET });
     if (!near.solution) return hint(layer, 'hint.unavailable', {});
     const changed = [];
     for (let v = 0; v < n; v++) if (colors[v] !== EMPTY && near.solution[v] !== colors[v]) changed.push(v);
@@ -131,12 +132,13 @@ export function computeHint(puzzle, colors, layer = 1) {
     if (layer === 1) return hint(1, 'hint.lookBack', {}, { regions: blocked >= 0 ? [blocked, ...changed] : changed });
     if (layer === 2) {
         if (blocked >= 0) return hint(2, 'hint.blocked', { region: R(blocked) }, { regions: [blocked, ...adj[blocked]] });
+        if (!near.optimal) return hint(2, 'hint.unavailable', {});
         return hint(2, 'hint.deadEnd', { n: changed.length }, { regions: changed });
     }
     // optional swap shortcut: one swap that frees the blocked region
     if (blocked >= 0 && Array.isArray(puzzle.actions) && puzzle.actions.includes('swap')) {
         const locked = puzzle.fixed.map(c => c !== EMPTY);
-        const goal = s => bits(neighbourMask(adj, s, blocked), k).length < k && isExtendable(adj, s, { k, nodeLimit: 50_000 }).extendable;
+        const goal = s => bits(neighbourMask(adj, s, blocked), k).length < k && isExtendable(adj, s, { k, maxColors, nodeLimit: 50_000 }).extendable;
         const bfs = shortestSwapPath(adj, colors, { locked, isGoal: goal, maxStates: 4000, maxDepth: 1 });
         if (bfs.found && bfs.path.length === 1) {
             const mv = bfs.path[0];
