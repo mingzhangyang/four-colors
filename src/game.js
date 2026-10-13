@@ -332,6 +332,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
     function applySettings() {
         setLang(settings.get('lang'));
         applyTheme();
+        document.documentElement.dataset.skin = settings.get('skin');
         document.documentElement.classList.toggle('reduce-motion', settings.reducedMotion());
         document.documentElement.classList.toggle('motion-full', settings.get('motion') === 'full');
         refreshChrome();
@@ -352,6 +353,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
             map.setOptions({ reducedMotion: settings.reducedMotion() });
         }
         if (key === 'skin') {
+            document.documentElement.dataset.skin = settings.get('skin');
             if (play) applyPalette();
             if (view === 'atlas') atlas.render();
         }
@@ -647,7 +649,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
             labels: settings.get('labels'),
             reducedMotion: settings.reducedMotion(),
         });
-        map.revealArt(play.complete);
+        map.revealArt(play.complete || play.kind === 'collect');
         refreshPlayLabels();
         toggleTray(false);
         renderPlay();
@@ -999,7 +1001,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
         if (!play || !play.level.views.length) return;
         const next = (map.viewIndex + 1) % (play.level.views.length + 1);
         map.setView(next);
-        map.revealArt(play.complete);
+        map.revealArt(play.complete || play.kind === 'collect');
         renderPlay();
     }
 
@@ -1274,7 +1276,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
         const grid = el('div', { class: 'mosaic' });
         for (const lv of all) {
             const colors = solved(lv);
-            const a = el('a', { class: `mosaic-cell${colors ? ' is-done' : ''}`, href: `#/p/${lv.id}`, 'aria-label': tx(lv.name) }, [thumb(lv, colors, paletteFor(lv.chapter, settings.get('skin')))]);
+            const a = el('a', { class: `mosaic-cell${colors ? ' is-done' : ''}`, href: `#/p/${lv.id}`, 'aria-label': tx(lv.name) }, [thumb(lv, colors, paletteFor(lv.chapter, settings.get('skin')), { art: Boolean(colors) })]);
             grid.append(a);
         }
         section.append(grid, el('div', { class: 'sheet-actions' }, [

@@ -3,7 +3,7 @@
 // region's displayed color for ~200ms but every new render settles them.
 
 import { svg, el, clear } from './dom.js';
-import { LANDMARKS } from './landmarks.js';
+import { artworkSVG, borderPaths } from './scenery.js';
 import { EMPTY } from '../model/rules.js';
 
 const FILL_MS = 180;
@@ -89,7 +89,8 @@ export function createMap({ onPointerTarget = null } = {}) {
         layers.regions.append(...regionNodes);
         layers.textures.append(...textureNodes);
         if (view.coast) layers.ink.append(svg('path', { class: 'coast', d: view.coast }));
-        layers.ink.append(svg('path', { class: 'ink', d: view.outline }));
+        const borders = borderPaths(view);
+        layers.ink.append(svg('path', { class: 'ink', d: borders.inner }), svg('path', { class: 'ink ink-outer', d: borders.outer }));
         root.append(...Object.values(layers));
         buildMarks();
         buildArt();
@@ -122,15 +123,7 @@ export function createMap({ onPointerTarget = null } = {}) {
 
     function buildArt() {
         clear(layers.art);
-        const art = viewIndex === 0 ? level.art : [];
-        art.forEach(([, kind, ax, ay, s], k) => {
-            const d = LANDMARKS[kind];
-            if (!d) return;
-            layers.art.append(svg('g', { class: 'landmark', transform: `translate(${ax} ${ay}) scale(${s})`, style: `--delay:${k * 160}ms` }, [
-                svg('path', { class: 'landmark-halo', d }),
-                svg('path', { class: 'landmark-ink', d }),
-            ]));
-        });
+        layers.art.append(...artworkSVG(level, view));
     }
 
     function buildLabels() {

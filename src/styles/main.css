@@ -3,10 +3,10 @@
    paper; dark is the same page under a reading lamp. */
 
 :root {
-    --desk: #e8decb;
-    --desk-2: #ddd1bb;
-    --paper: #f7f0e3;
-    --paper-2: #efe5d3;
+    --desk: #d5d7cc;
+    --desk-2: #bfc5b9;
+    --paper: #faf6ec;
+    --paper-2: #f0eadb;
     --paper-edge: #dccdb3;
     --ink: #2b3337;
     --ink-soft: #5c6467;
@@ -18,10 +18,10 @@
     --hint: #1d58a8;
     --conflict: #b1271b;
     --empty: #fcf9f2;
-    --faded: rgba(43, 51, 55, 0.12);
+    --faded: rgba(43, 51, 55, 0.05);
     --sea: #bdd4d3;
     --sea-line: rgba(39, 92, 100, 0.34);
-    --tex-ink: rgba(20, 24, 26, 0.3);
+    --tex-ink: rgba(20, 24, 26, 0.17);
     --btn-bg: #fffaf1;
     --btn-border: rgba(43, 51, 55, 0.22);
     --btn-hover: #fff4e2;
@@ -58,7 +58,7 @@
     --faded: rgba(237, 228, 210, 0.08);
     --sea: #2a4b50;
     --sea-line: rgba(160, 210, 214, 0.34);
-    --tex-ink: rgba(8, 8, 8, 0.4);
+    --tex-ink: rgba(8, 8, 8, 0.24);
     --btn-bg: #312e27;
     --btn-border: rgba(237, 228, 210, 0.2);
     --btn-hover: #3a362e;
@@ -82,7 +82,8 @@ body {
 }
 
 body {
-    background: var(--desk);
+    background: radial-gradient(ellipse at 50% 0, var(--desk), var(--desk-2));
+    background-attachment: fixed;
     color: var(--ink);
     font: 15px/1.5 var(--sans);
     -webkit-tap-highlight-color: transparent;
@@ -375,7 +376,7 @@ a {
     inset: 0;
     border-radius: inherit;
     background-image: var(--grain);
-    opacity: 0.32;
+    opacity: 0.14;
     mix-blend-mode: multiply;
     pointer-events: none;
     z-index: -1;
@@ -509,8 +510,9 @@ a {
     height: 50px;
     padding: 4px;
     border: 1.5px solid var(--btn-border);
-    border-radius: 50%;
+    border-radius: 43% 47% 44% 46%;
     background: var(--btn-bg);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 3px 0 var(--paper-edge);
     cursor: pointer;
     transition: transform 0.14s ease;
 }
@@ -522,11 +524,11 @@ a {
 .paint[aria-pressed="true"] {
     transform: translateY(-3px);
     border-color: var(--ink);
-    box-shadow: 0 0 0 2.5px var(--ink), var(--shadow-soft);
+    box-shadow: 0 0 0 1.5px var(--ink), 0 5px 0 var(--paper-edge);
 }
 
 .palette[data-tool="swap"] .paint[aria-pressed="true"] {
-    box-shadow: 0 0 0 2.5px var(--accent), var(--shadow-soft);
+    box-shadow: 0 0 0 1.5px var(--accent), 0 5px 0 var(--paper-edge);
     border-color: var(--accent);
 }
 
@@ -812,7 +814,7 @@ a {
 .ink {
     fill: none;
     stroke: var(--ink);
-    stroke-width: 1.7;
+    stroke-width: 1.05;
     stroke-linejoin: round;
     stroke-linecap: round;
     vector-effect: non-scaling-stroke;
@@ -1000,8 +1002,8 @@ a {
 
 .landmark-halo {
     fill: none;
-    stroke: rgba(255, 251, 242, 0.72);
-    stroke-width: 3.8;
+    stroke: rgba(255, 251, 242, 0.55);
+    stroke-width: 1.8;
     stroke-linecap: round;
     stroke-linejoin: round;
 }
@@ -1009,7 +1011,7 @@ a {
 .landmark-ink {
     fill: none;
     stroke: var(--ink-on-color);
-    stroke-width: 1.55;
+    stroke-width: 0.85;
     stroke-linecap: round;
     stroke-linejoin: round;
 }
@@ -1151,7 +1153,7 @@ a {
     position: absolute;
     inset: 0;
     background-image: var(--grain);
-    opacity: 0.32;
+    opacity: 0.14;
     mix-blend-mode: multiply;
     z-index: -1;
 }
@@ -1367,7 +1369,7 @@ a.level-card:hover {
 .thumb-ink {
     fill: none;
     stroke: var(--ink);
-    stroke-width: 1.2;
+    stroke-width: 0.7;
     stroke-linejoin: round;
     vector-effect: non-scaling-stroke;
 }
@@ -1836,4 +1838,49 @@ a.level-card:hover {
         animation-delay: 0ms !important;
         transition-duration: 1ms !important;
     }
+}
+
+/* Cartographic hierarchy: linework stays on the compiled shared edges. */
+.ink-outer { stroke-width: 1.9; }
+.thumb-outer { stroke-width: 1.2; }
+.landmark-wash { fill: rgba(255, 250, 231, 0.65); stroke: none; }
+.thumb-art { pointer-events: none; }
+:root[data-skin="contrast"] { --tex-ink: rgba(8, 12, 14, 0.4); }
+:root[data-skin="contrast"] .ink { stroke-width: 1.7; }
+:root[data-skin="contrast"] .ink-outer { stroke-width: 2.2; }
+
+/* Chapter plates give the atlas the rhythm of an illustrated book. */
+.chapter-frontispiece {
+    position: relative;
+    min-height: 132px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 18px 180px 18px 20px;
+    border: 1px solid var(--ink-faint);
+    border-left: 4px solid var(--chapter-ink);
+    background: var(--paper);
+    box-shadow: var(--shadow-soft);
+}
+.chapter-frontispiece .chapter-kicker { letter-spacing: 0.16em; }
+.chapter-plate {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 150px;
+    height: 112px;
+    pointer-events: none;
+}
+.plate-sun { fill: var(--chapter-ink); opacity: 0.2; }
+.plate-rule { fill: none; stroke: var(--chapter-ink); stroke-width: 0.45; opacity: 0.45; }
+.plate-ink { fill: none; stroke: var(--ink); stroke-width: 0.9; stroke-linecap: round; stroke-linejoin: round; }
+.card-thumb { padding: 7px; border: 1px solid var(--ink-faint); background: var(--paper-2); }
+.card-number { font-variant-numeric: tabular-nums; letter-spacing: 0.12em; }
+.level-card.is-done { border-bottom: 2px solid var(--chapter-ink, var(--accent)); }
+@media (max-width: 540px) {
+    .chapter-frontispiece { min-height: 126px; padding: 14px 112px 14px 12px; }
+    .chapter-plate { width: 96px; height: 94px; right: 5px; }
+    .chapter-frontispiece .chapter-name { font-size: 20px; }
+    .chapter-frontispiece .chapter-blurb { font-size: 12px; }
 }

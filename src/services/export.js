@@ -2,11 +2,11 @@
 // and saved as PNG, plus spoiler-free share text. Shared text never reveals the
 // solution coloring: its pattern is derived from the page id only.
 
-import { LANDMARKS } from '../render/landmarks.js';
+import { artworkFor, borderPaths } from '../render/scenery.js';
 import { EMPTY } from '../model/rules.js';
 import { fnv1a } from '../content/checksum.js';
 
-const PAPER = '#f4ecdd';
+const PAPER = '#faf6ec';
 const INK = '#2b3337';
 const SEA = '#b9d1d2';
 const EMPTY_FILL = '#fbf7ef';
@@ -17,8 +17,8 @@ function texturePattern(ctx, c) {
     cv.width = size;
     cv.height = size;
     const g = cv.getContext('2d');
-    g.strokeStyle = 'rgba(30,30,30,0.32)';
-    g.fillStyle = 'rgba(30,30,30,0.32)';
+    g.strokeStyle = 'rgba(30,30,30,0.17)';
+    g.fillStyle = 'rgba(30,30,30,0.17)';
     g.lineWidth = 1.6;
     if (c === 0) { g.beginPath(); g.arc(12, 12, 3, 0, Math.PI * 2); g.fill(); }
     if (c === 1) { g.beginPath(); g.moveTo(-4, 4); g.lineTo(4, -4); g.moveTo(0, 24); g.lineTo(24, 0); g.moveTo(20, 28); g.lineTo(28, 20); g.stroke(); }
@@ -52,21 +52,29 @@ export function drawPage(ctx, level, colors, { palette, texture = true, art = tr
     ctx.strokeStyle = INK;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    ctx.lineWidth = 1.6;
-    ctx.stroke(new Path2D(level.outline));
+    const borders = borderPaths(level);
+    ctx.lineWidth = 1.2;
+    ctx.stroke(new Path2D(borders.inner));
+    ctx.lineWidth = 2.2;
+    ctx.stroke(new Path2D(borders.outer));
     if (art) {
-        for (const [, kind, ax, ay, s] of level.art) {
-            const d = LANDMARKS[kind];
-            if (!d) continue;
+        for (const { x: ax, y: ay, scale, paths } of artworkFor(level)) {
             ctx.save();
             ctx.translate(ax, ay);
-            ctx.scale(s, s);
-            ctx.lineWidth = 3.4;
-            ctx.strokeStyle = 'rgba(255,253,247,0.7)';
-            ctx.stroke(new Path2D(d));
-            ctx.lineWidth = 1.5;
-            ctx.strokeStyle = INK;
-            ctx.stroke(new Path2D(d));
+            ctx.scale(scale, scale);
+            for (const { d, fill } of paths) {
+                if (fill) {
+                    ctx.fillStyle = 'rgba(255,250,231,0.65)';
+                    ctx.fill(new Path2D(d));
+                } else {
+                    ctx.lineWidth = 1.8;
+                    ctx.strokeStyle = 'rgba(255,253,247,0.55)';
+                    ctx.stroke(new Path2D(d));
+                    ctx.lineWidth = 0.85;
+                    ctx.strokeStyle = INK;
+                    ctx.stroke(new Path2D(d));
+                }
+            }
             ctx.restore();
         }
     }
