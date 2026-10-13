@@ -18,7 +18,7 @@
 | §8 数据、几何与求解器 | 关卡主数据（共享顶点、边、区域环、固定色、初始色、动作、目标、见证、难度标签、地标锚点）存于 `content/master/`；编译器从共享边推导邻接与 SVG path，检查固定精度、零长边、非流形、裂缝、交叉、嵌套、角点接触、最小共享边与触控下限；运行时校验内容校验和；DSATUR/MRV + 前向检查 + 回溯求解；交换短篇用 BFS 证明最短交换数，超预算的候选直接丢弃 | `tools/lib/*`、`tools/generators/four-colors-build.mjs`、`src/model/solver.js` |
 | §9 状态、存档与异步安全 | 单一命令入口（填色、擦除、交换、重开、撤销、重做）先更新模型与完成判定再渲染与存档；动画只是投影；提示 Worker 结果带 sessionId + puzzleRevision + stateRevision，不匹配即丢弃，2.5s 超时显示“暂时无法给出建议”；版本化单快照存档、`trySet` 明确写入结果、失败只给非阻塞提醒；历史超 200 步截断并提示可撤销范围；恢复时校验类型、颜色、区域数、固定色与 revision；多标签页写入版本检查与冲突提示 | `src/storage.js`、`src/services/hints.js` |
 | §10 每日内容 | 60 个离线生成并审核的编号每日谜题 No.1–No.60，不绑定日历日期；今日编号 = 自起始日 2026-10-13（UTC+8）起的天数 + 1；已发布编号与起始日写入不可变清单（`content/daily-lock.json` 只追加）；编号写入地址并锁定 revision，跨午夜仍完成原题，回到地图册提示新编号；往期编号随时可补玩，题库用完后明确提示；首次需要时才下载当天的题（约 5 KB gzip） | `tools/levels/daily.mjs`、`src/services/daily.js` |
-| 独立交付 | 自有 package.json/锁文件、设置、存档、每日日期工具与 CI；`?lang=` / `?theme=` 白名单入口参数（已存偏好优先，识别后从地址栏移除，不写成偏好）；固定“返回游戏合集”链接；canonical、sitemap、robots、OG 图、manifest、404、缓存头；Cloudflare 自定义域名 `four-colors.orangely.xyz`，由 Workers Builds 关联仓库自动部署，构建命令先跑内容检查与测试 | `index.html`、`public/`、`wrangler.jsonc`、`.github/workflows/` |
+| 独立交付 | 自有 package.json/锁文件、设置、存档、每日日期工具与 CI；`?lang=` / `?theme=` 白名单入口参数（已存偏好优先，识别后从地址栏移除，不写成偏好）；固定“返回游戏合集”链接；canonical、sitemap、robots、OG 图、manifest、404、缓存头；Cloudflare 自定义域名 `four-colors.orangely.xyz` 与 Workers Builds 自动部署的仓库侧配置（控制台关联待完成，见第 3 节），构建命令先跑内容检查与测试 | `index.html`、`public/`、`wrangler.jsonc`、`.github/workflows/` |
 
 ## 2 机器验收（全部通过）
 

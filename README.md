@@ -2,7 +2,7 @@
 
 用四种颜色修复一部失色地图册：相邻区域不同色，在边界之间寻找协调的秩序。独立开发、独立部署的单页解谜游戏（vanilla JavaScript + Vite + SVG）。
 
-当前阶段：**首发候选已实现**——32 个主线关、8 个修复短篇、60 张编号每日地图、收藏配色与导出均可玩，模型/内容/浏览器测试通过；部署已配置为 Cloudflare 自动部署，尚未做真人试玩与真机验收（见 [实现状态](docs/implementation-status.md)）。
+当前阶段：**首发候选已实现**——32 个主线关、8 个修复短篇、60 张编号每日地图、收藏配色与导出均可玩，模型/内容/浏览器测试通过；Cloudflare 自动部署的仓库侧配置已就绪，但站点尚未上线，也尚未做真人试玩与真机验收（见 [实现状态](docs/implementation-status.md)）。
 
 - [完整实现方案（持续维护的详细规格）](docs/implementation-plan.md)
 - [实现状态与验收证据](docs/implementation-status.md)
@@ -10,7 +10,7 @@
 - [四色地图示意图](docs/diagrams/fourfold-atlas-four-colors.svg)
 - [Mini Games Collection](https://github.com/mingzhangyang/games)
 
-正式地址：`https://four-colors.orangely.xyz`——Cloudflare Workers Builds 关联本仓库，推送 `main` 自动部署（首次关联步骤见 [部署与回滚](docs/deploy.md)）。
+计划正式地址：`https://four-colors.orangely.xyz`（尚未上线）。仓库侧已按 Cloudflare Workers Builds 配置好（关联后推送 `main` 即自动部署），但还需在 Cloudflare 控制台把本仓库关联到 Workers Builds；完成这一步之前不会部署，步骤见 [部署与回滚](docs/deploy.md)。
 
 ## 快速开始
 
