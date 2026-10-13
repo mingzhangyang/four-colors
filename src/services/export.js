@@ -11,14 +11,20 @@ const INK = '#2b3337';
 const SEA = '#b9d1d2';
 const EMPTY_FILL = '#fbf7ef';
 
-function texturePattern(ctx, c) {
+// The high-contrast skin keeps stronger texture ink and borders, as on screen.
+const LINE = {
+    normal: { tex: 'rgba(30,30,30,0.17)', inner: 1.2, outer: 2.2 },
+    contrast: { tex: 'rgba(8,12,14,0.4)', inner: 1.7, outer: 2.6 },
+};
+
+function texturePattern(ctx, c, ink) {
     const size = 24;
     const cv = document.createElement('canvas');
     cv.width = size;
     cv.height = size;
     const g = cv.getContext('2d');
-    g.strokeStyle = 'rgba(30,30,30,0.17)';
-    g.fillStyle = 'rgba(30,30,30,0.17)';
+    g.strokeStyle = ink;
+    g.fillStyle = ink;
     g.lineWidth = 1.6;
     if (c === 0) { g.beginPath(); g.arc(12, 12, 3, 0, Math.PI * 2); g.fill(); }
     if (c === 1) { g.beginPath(); g.moveTo(-4, 4); g.lineTo(4, -4); g.moveTo(0, 24); g.lineTo(24, 0); g.moveTo(20, 28); g.lineTo(28, 20); g.stroke(); }
@@ -28,13 +34,14 @@ function texturePattern(ctx, c) {
 }
 
 /** Draw one page into ctx at the current transform (map coordinates). */
-export function drawPage(ctx, level, colors, { palette, texture = true, art = true }) {
+export function drawPage(ctx, level, colors, { palette, texture = true, art = true, contrast = false }) {
     const [x, y, w, h] = level.box;
+    const line = contrast ? LINE.contrast : LINE.normal;
     if (level.water) {
         ctx.fillStyle = SEA;
         ctx.fillRect(x, y, w, h);
     }
-    const patterns = texture ? [0, 1, 2, 3].map(c => texturePattern(ctx, c)) : null;
+    const patterns = texture ? [0, 1, 2, 3].map(c => texturePattern(ctx, c, line.tex)) : null;
     level.paths.forEach((d, i) => {
         const p = new Path2D(d);
         const c = colors[i];
@@ -53,9 +60,9 @@ export function drawPage(ctx, level, colors, { palette, texture = true, art = tr
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     const borders = borderPaths(level);
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = line.inner;
     ctx.stroke(new Path2D(borders.inner));
-    ctx.lineWidth = 2.2;
+    ctx.lineWidth = line.outer;
     ctx.stroke(new Path2D(borders.outer));
     if (art) {
         for (const { x: ax, y: ay, scale, paths } of artworkFor(level)) {
@@ -103,7 +110,7 @@ function drawSeal(ctx, cx, cy, r, text) {
     ctx.restore();
 }
 
-export function renderPage(level, colors, { palette, texture = true, title = '', subtitle = '', seal = '' }) {
+export function renderPage(level, colors, { palette, texture = true, contrast = false, title = '', subtitle = '', seal = '' }) {
     const [x, y, w, h] = level.box;
     const scale = 2;
     const margin = 36;
@@ -123,14 +130,14 @@ export function renderPage(level, colors, { palette, texture = true, title = '',
     ctx.fillText(subtitle, margin, margin + 42);
     ctx.save();
     ctx.translate(margin - x, margin + header - y);
-    drawPage(ctx, level, colors, { palette, texture });
+    drawPage(ctx, level, colors, { palette, texture, contrast });
     ctx.restore();
     if (seal) drawSeal(ctx, w + margin - 34, margin + 22, 30, seal);
     return cv;
 }
 
 /** The complete work: every main page in one sheet (8 columns × 4 chapters). */
-export function renderMosaic(levels, colorsFor, paletteFor, { title = '', texture = false }) {
+export function renderMosaic(levels, colorsFor, paletteFor, { title = '', texture = false, contrast = false }) {
     const cellW = 120;
     const cellH = 160;
     const gap = 10;
@@ -161,7 +168,7 @@ export function renderMosaic(levels, colorsFor, paletteFor, { title = '', textur
         ctx.scale(s, s);
         ctx.translate(-x, -y);
         const colors = colorsFor(lv);
-        drawPage(ctx, lv, colors || lv.paths.map(() => EMPTY), { palette: paletteFor(lv), texture, art: Boolean(colors) });
+        drawPage(ctx, lv, colors || lv.paths.map(() => EMPTY), { palette: paletteFor(lv), texture, contrast, art: Boolean(colors) });
         ctx.restore();
     });
     return cv;

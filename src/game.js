@@ -1221,6 +1221,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
             const canvas = renderPage(level, colors, {
                 palette: paletteFor(level.chapter, settings.get('skin')),
                 texture,
+                contrast: settings.get('skin') === 'contrast',
                 title: `${t('app.title')} · ${level.mode === 'daily' ? t('daily.number', { no: level.no }) : tx(level.name)}`,
                 subtitle: level.mode === 'main' ? `${tx(chapterById(level.chapter).name)} · ${t('level.page', { n: level.index })}` : '',
                 seal: isDone(level.id) ? t('complete.stamp') : '',
@@ -1285,7 +1286,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
                 class: 'btn',
                 onclick: async () => {
                     try {
-                        const canvas = renderMosaic(all, solved, lv => paletteFor(lv.chapter, settings.get('skin')), { title: `${t('app.title')} · ${t('collection.fullWork')}` });
+                        const canvas = renderMosaic(all, solved, lv => paletteFor(lv.chapter, settings.get('skin')), { title: `${t('app.title')} · ${t('collection.fullWork')}`, contrast: settings.get('skin') === 'contrast' });
                         const ok = await downloadCanvas(canvas, 'fourfold-atlas-complete.png');
                         toasts.show('export', ok ? t('export.done') : t('export.failed'));
                     } catch {

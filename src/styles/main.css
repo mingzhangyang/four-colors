@@ -1848,6 +1848,8 @@ a.level-card:hover {
 :root[data-skin="contrast"] { --tex-ink: rgba(8, 12, 14, 0.4); }
 :root[data-skin="contrast"] .ink { stroke-width: 1.7; }
 :root[data-skin="contrast"] .ink-outer { stroke-width: 2.2; }
+:root[data-skin="contrast"] .thumb-ink { stroke-width: 1.2; }
+:root[data-skin="contrast"] .thumb-outer { stroke-width: 1.7; }
 
 /* Chapter plates give the atlas the rhythm of an illustrated book. */
 .chapter-frontispiece {

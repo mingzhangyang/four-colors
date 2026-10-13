@@ -466,14 +466,21 @@ await scenario('rotation keeps every region tappable', async () => {
     await ctx.close();
 });
 
-await scenario('settings: language and theme apply and persist; entry params never override stored ones', async () => {
+await scenario('settings: language, theme and skin apply and persist; entry params never override stored ones', async () => {
     const { page, ctx } = await open({ hash: '#/atlas/ch1', seed: seedDone(['FC01']) });
+    const thumbStrokes = () => page.evaluate(() => ['.thumb-ink:not(.thumb-outer)', '.thumb-outer']
+        .map(s => parseFloat(getComputedStyle(document.querySelector(s)).strokeWidth)));
+    const [inner, outer] = await thumbStrokes();
     await page.click('.topbar-right .icon-btn:last-child');
     await page.locator('label.choice', { has: page.locator('input[name="lang"][value="en"]') }).click();
     await page.locator('label.choice', { has: page.locator('input[name="theme"][value="dark"]') }).click();
+    await page.locator('label.choice', { has: page.locator('input[name="skin"][value="contrast"]') }).click();
     await page.click('.settings-sheet .btn-primary');
     assert.equal(await page.locator('.cover-title').textContent(), 'Fourfold Atlas');
     assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.skin), 'contrast');
+    const [hcInner, hcOuter] = await thumbStrokes();
+    assert.ok(hcInner > inner && hcOuter > outer && hcOuter > hcInner, 'high contrast thickens thumbnail borders and keeps their hierarchy');
     await page.reload();
     await page.waitForSelector('.cover-title');
     assert.equal(await page.locator('.cover-title').textContent(), 'Fourfold Atlas');
