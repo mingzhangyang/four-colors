@@ -8,7 +8,7 @@ import {
 } from './content/levels.js';
 import { chapterById, paletteFor } from './content/chapters.js';
 import { EMPTY, evaluate } from './model/rules.js';
-import { createState, execute, restoreState, serializeState, swapCount } from './model/commands.js';
+import { createState, execute, restoreState, serializeState, swapCount, trimSavedHistory } from './model/commands.js';
 import { previewSwap } from './model/kempe.js';
 import { createMap } from './render/map.js';
 import { createAtlasView, thumb } from './render/atlas.js';
@@ -263,12 +263,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
         const keys = Object.keys(snap.sessions).sort((a, b) => (snap.sessions[b].touchedAt || 0) - (snap.sessions[a].touchedAt || 0));
         keys.forEach((k, i) => {
             if (i >= MAX_SESSIONS) delete snap.sessions[k];
-            else if (k !== key && snap.sessions[k].undo && snap.sessions[k].undo.length > MAX_IDLE_HISTORY) {
-                const s = snap.sessions[k];
-                s.undo = s.undo.slice(-MAX_IDLE_HISTORY);
-                s.redo = (s.redo || []).slice(-MAX_IDLE_HISTORY);
-                s.truncated = true;
-            }
+            else if (k !== key) snap.sessions[k] = trimSavedHistory(snap.sessions[k], MAX_IDLE_HISTORY);
         });
     }
 

@@ -47,14 +47,22 @@ function applyChanges(colors, changes, field) {
     return next;
 }
 
+// Swaps that fall off the start of the history still count towards the page's
+// swap total, unless a restart fell off after them.
+function countDropped(droppedSwaps, entries) {
+    for (const e of entries) {
+        if (e && e.k === 'swap') droppedSwaps++;
+        if (e && e.k === 'restart') droppedSwaps = 0;
+    }
+    return droppedSwaps;
+}
+
 function pushHistory(state, entry) {
     const undo = state.undo.concat([entry]);
     let { droppedSwaps, truncated } = state;
-    while (undo.length > MAX_HISTORY) {
-        const old = undo.shift();
+    if (undo.length > MAX_HISTORY) {
+        droppedSwaps = countDropped(droppedSwaps, undo.splice(0, undo.length - MAX_HISTORY));
         truncated = true;
-        if (old.k === 'swap') droppedSwaps++;
-        if (old.k === 'restart') droppedSwaps = 0;
     }
     return { undo, droppedSwaps, truncated };
 }
@@ -249,11 +257,7 @@ export function restoreState(puzzle, raw) {
 /** Compact a state for storage: cap history and drop transient fields. */
 export function serializeState(state, maxHistory = MAX_HISTORY) {
     const undo = state.undo.slice(-maxHistory);
-    let droppedSwaps = state.droppedSwaps;
-    for (const e of state.undo.slice(0, state.undo.length - undo.length)) {
-        if (e.k === 'swap') droppedSwaps++;
-        if (e.k === 'restart') droppedSwaps = 0;
-    }
+    const droppedSwaps = countDropped(state.droppedSwaps, state.undo.slice(0, state.undo.length - undo.length));
     return {
         puzzleId: state.puzzleId,
         revision: state.revision,
@@ -267,5 +271,19 @@ export function serializeState(state, maxHistory = MAX_HISTORY) {
         tool: state.tool,
         color: state.color,
         pair: state.pair,
+    };
+}
+
+/** Trim a stored session to its last `max` undo/redo entries, keeping its swap total. */
+export function trimSavedHistory(saved, max) {
+    if (!Array.isArray(saved.undo) || saved.undo.length <= max) return saved;
+    const cut = saved.undo.length - max;
+    const dropped = Number.isInteger(saved.droppedSwaps) && saved.droppedSwaps >= 0 ? saved.droppedSwaps : 0;
+    return {
+        ...saved,
+        undo: saved.undo.slice(cut),
+        redo: Array.isArray(saved.redo) ? saved.redo.slice(-max) : [],
+        droppedSwaps: countDropped(dropped, saved.undo.slice(0, cut)),
+        truncated: true,
     };
 }

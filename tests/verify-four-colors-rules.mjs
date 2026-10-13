@@ -8,7 +8,7 @@ import { buildMesh } from '../tools/lib/mesh-build.mjs';
 import { compileMesh } from '../tools/lib/mesh-compiler.mjs';
 import { grid2x2, k4Disc, hexRing, bands } from '../tools/levels/shapes.mjs';
 import { EMPTY, evaluate, findConflicts, isValidSolution } from '../src/model/rules.js';
-import { createState, execute, restoreState, serializeState, swapCount, MAX_HISTORY } from '../src/model/commands.js';
+import { createState, execute, restoreState, serializeState, swapCount, trimSavedHistory, MAX_HISTORY } from '../src/model/commands.js';
 import { kempeComponent, previewSwap, shortestSwapPath } from '../src/model/kempe.js';
 import { solve, countSolutions, isExtendable, nearestSolution, chromaticNumber, viableCandidates } from '../src/model/solver.js';
 import { computeHint } from '../src/services/hint-engine.js';
@@ -373,6 +373,26 @@ function memoryBackend({ failWrites = false } = {}) {
     };
 }
 
+test('trimming a stored history keeps the swaps it drops in the swap total', () => {
+    const p = puzzle([[1], [0]], { initial: [0, 1], actions: ['swap'] });
+    const there = { k: 'swap', c: [[0, 0, 1], [1, 1, 0]] };
+    const back = { k: 'swap', c: [[0, 1, 0], [1, 0, 1]] };
+    const swaps = len => Array.from({ length: len }, (_, i) => (i % 2 ? back : there));
+    const saved = { ...serializeState({ ...createState(p), colors: [1, 0], undo: swaps(45) }), touchedAt: 1 };
+    assert.equal(swapCount(restoreState(p, saved)), 45);
+    const idle = trimSavedHistory(saved, 40);
+    assert.equal(idle.undo.length, 40);
+    assert.equal(idle.truncated, true);
+    assert.equal(idle.touchedAt, 1);
+    assert.equal(swapCount(restoreState(p, idle)), 45, 'dropped swaps still count');
+    assert.equal(trimSavedHistory(idle, 40), idle, 'short histories are left alone');
+    // swaps before a restart that falls off no longer count
+    const restart = { k: 'restart', c: [[0, 1, 0], [1, 0, 1]] };
+    const reset = { ...serializeState({ ...createState(p), colors: [0, 1], undo: [...swaps(3), restart, ...swaps(42)] }), touchedAt: 1 };
+    assert.equal(swapCount(restoreState(p, reset)), 42);
+    assert.equal(swapCount(restoreState(p, trimSavedHistory(reset, 40))), 42);
+});
+
 test('storage trySet reports failure; save never claims success on failure', () => {
     const storage = createStorage({ backend: memoryBackend({ failWrites: true }) });
     assert.equal(storage.trySet('x', { a: 1 }), false);
@@ -488,6 +508,30 @@ test('hint service: tagged replies, timeout and cancellation never touch state',
     assert.equal(r3.sessionId, 4);
     assert.equal(r3.stateRevision, 1);
     assert.equal(svc3.pendingCount, 0);
+});
+
+test('hint service: a timeout or cancel stops the busy Worker; the next request gets a fresh one', async () => {
+    const made = [];
+    const factory = () => {
+        const w = { terminated: false, postMessage() {}, terminate() { this.terminated = true; } };
+        made.push(w);
+        return w;
+    };
+    const svc = createHintService({ timeoutMs: 20, workerFactory: factory });
+    const req = stateRevision => svc.request({ sessionId: 1, puzzleRevision: 1, stateRevision, puzzle: puzzle(PATH4), colors: [0, -1, -1, -1], layer: 1 });
+    const r = await req(1);
+    assert.equal(r.timedOut, true);
+    assert.equal(made[0].terminated, true, 'the abandoned computation is stopped');
+    const next = req(2);
+    assert.equal(made.length, 2, 'the next request runs on a fresh Worker');
+    svc.cancelAll();
+    const c = await next;
+    assert.equal(c.cancelled, true);
+    assert.equal(c.stateRevision, 2);
+    assert.equal(made[1].terminated, true);
+    assert.equal(svc.pendingCount, 0);
+    svc.cancelAll();
+    assert.equal(made.length, 2, 'cancelling while idle starts nothing');
 });
 
 await run('verify-four-colors-rules');

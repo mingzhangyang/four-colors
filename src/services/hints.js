@@ -1,9 +1,9 @@
 // Hint service: requests go to a Worker tagged with sessionId + puzzleRevision +
 // stateRevision. A reply that no longer matches the page is discarded; a slow
 // reply resolves as "unavailable" and never changes the game state. Leaving,
-// restarting or switching pages cancels outstanding requests. Without a
-// Worker the hint is reported unavailable: running the solver on the page
-// would block input and the timeout could never fire.
+// restarting or switching pages cancels outstanding requests. Without a Worker
+// the hint is reported unavailable: running the solver on the page would block
+// input and the timeout could never fire.
 
 export const HINT_TIMEOUT_MS = 2500;
 
@@ -27,18 +27,28 @@ export function createHintService({ timeoutMs = HINT_TIMEOUT_MS, workerFactory =
             };
             worker.onerror = () => {
                 workerFailed = true;
-                worker = null;
-                for (const [id, p] of pending) {
-                    pending.delete(id);
-                    clearTimeout(p.timer);
-                    p.resolve({ ...p.tags, result: null, failed: true });
-                }
+                abandon('failed');
             };
         } catch {
             workerFailed = true;
             worker = null;
         }
         return worker;
+    }
+
+    // The Worker answers in order, so an abandoned request would keep it busy and
+    // queue the next hint behind it. A timeout or cancel therefore stops the Worker
+    // (a new one starts with the next request) and settles everything it held.
+    function abandon(flag) {
+        if (worker) {
+            try { worker.terminate(); } catch { /* ignore */ }
+            worker = null;
+        }
+        for (const [id, p] of pending) {
+            pending.delete(id);
+            clearTimeout(p.timer);
+            p.resolve({ ...p.tags, result: null, [flag]: true });
+        }
     }
 
     return {
@@ -59,20 +69,13 @@ export function createHintService({ timeoutMs = HINT_TIMEOUT_MS, workerFactory =
                 layer,
             };
             return new Promise(resolve => {
-                const timer = setTimeout(() => {
-                    pending.delete(id);
-                    resolve({ ...tags, result: null, timedOut: true });
-                }, timeoutMs);
+                const timer = setTimeout(() => abandon('timedOut'), timeoutMs);
                 pending.set(id, { resolve, timer, tags });
                 w.postMessage(payload);
             });
         },
         cancelAll() {
-            for (const [id, p] of pending) {
-                clearTimeout(p.timer);
-                p.resolve({ id, result: null, cancelled: true });
-            }
-            pending.clear();
+            if (pending.size) abandon('cancelled');
         },
         get pendingCount() {
             return pending.size;
