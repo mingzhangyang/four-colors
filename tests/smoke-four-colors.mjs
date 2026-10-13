@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { startServer } from './lib/serve.mjs';
+import { ART_SAMPLES, ART_ENVELOPE_RADIUS } from '../src/render/scenery.js';
 import manifest from '../src/content/generated/daily-manifest.js';
 import { dateOfNumber } from '../src/services/daily.js';
 
@@ -85,6 +86,15 @@ const statusText = page => page.locator('#status').textContent();
 const pickColor = (page, c) => page.click(`.paint[data-c="${c}"]`);
 const openTray = async page => { if (await page.locator('.tray').isHidden()) await page.click('.dock-actions .icon-btn:last-child'); };
 
+async function assertArtwork(page, revealed) {
+    assert.ok(await page.locator('.layer-art .landmark path').count(), 'art paths exist');
+    assert.equal(await page.locator('.map.reveal-art').count(), Number(revealed));
+    await page.waitForFunction(expected => {
+        const nodes = [...document.querySelectorAll('.layer-art .landmark')];
+        return nodes.length > 0 && nodes.every(n => Number(getComputedStyle(n).opacity) === Number(expected));
+    }, revealed);
+}
+
 async function solveFromWitness(page) {
     const lv = await page.evaluate(() => {
         const p = window.__fourColors.play;
@@ -146,8 +156,14 @@ await scenario('painting, conflict borders, undo and redo', async () => {
 await scenario('completion: records, seal, landmarks and next page without a blocking dialog', async () => {
     const { page, ctx, errors } = await open({ hash: '#/p/FC01' });
     await waitPlay(page, 'FC01');
+    await assertArtwork(page, false);
     await solveFromWitness(page);
     await page.waitForSelector('.complete-bar:not([hidden])');
+    await assertArtwork(page, true);
+    await page.evaluate(() => window.__fourColors.commit({ type: 'undo' }));
+    await assertArtwork(page, false);
+    await page.evaluate(() => window.__fourColors.commit({ type: 'redo' }));
+    await assertArtwork(page, true);
     assert.ok(await page.locator('.page.is-complete').count());
     assert.match(await statusText(page), /修复完成/);
     assert.equal(await page.locator('dialog[open]').count(), 0, 'no modal over the map');
@@ -157,6 +173,60 @@ await scenario('completion: records, seal, landmarks and next page without a blo
     assert.equal(save.progress.FC01.independent, true);
     await page.click('.complete-bar .btn-primary');
     await waitPlay(page, 'FC02');
+    await assertArtwork(page, false);
+    assert.deepEqual(errors, []);
+    await ctx.close();
+});
+
+await scenario('sample SVG paths and strokes fit the declared artwork envelope', async () => {
+    const { page, ctx, errors } = await open({ hash: '#/p/FC01', reducedMotion: 'reduce' });
+    for (const id of ART_SAMPLES) {
+        await page.goto(BASE + `#/p/${id}`);
+        await waitPlay(page, id);
+        const measured = await page.evaluate(() => {
+            const paths = [...document.querySelectorAll('.layer-art .landmark path')];
+            const radius = path => {
+                // getBBox measures actual curves/arcs, not just authored anchors.
+                // A rectangle's farthest corner bounds the whole geometry; round
+                // caps/joins extend at most half a stroke beyond that rectangle.
+                const b = path.getBBox();
+                const style = getComputedStyle(path);
+                const stroke = style.stroke === 'none' ? 0 : parseFloat(style.strokeWidth) / 2;
+                return Math.hypot(Math.max(Math.abs(b.x), Math.abs(b.x + b.width)),
+                    Math.max(Math.abs(b.y), Math.abs(b.y + b.height))) + stroke;
+            };
+            const radii = paths.map(radius);
+            // Guard the test itself: extending a real path must be detected.
+            const probe = paths[0].cloneNode();
+            paths[0].parentNode.append(probe);
+            probe.setAttribute('d', 'M0 0 L100 0');
+            const escaped = radius(probe);
+            probe.remove();
+            return { radii, escaped };
+        });
+        assert.ok(measured.radii.length > 0, `${id} paths are present`);
+        measured.radii.forEach(r => assert.ok(r <= ART_ENVELOPE_RADIUS, `${id} path/stroke radius ${r} exceeds envelope`));
+        assert.ok(measured.escaped > ART_ENVELOPE_RADIUS, 'out-of-bounds edit is rejected');
+        if (id === 'FC23') {
+            await assertArtwork(page, false);
+            await openTray(page);
+            await page.click('.tray-views');
+            await assertArtwork(page, false);
+            await page.evaluate(() => {
+                const game = window.__fourColors;
+                game.play.level.witness.forEach((color, region) => {
+                    if (game.play.level.fixed[region] < 0) game.commit({ type: 'fill', region, color });
+                });
+            });
+            await assertArtwork(page, true);
+            await page.click('.complete-bar a[href="#/collect/FC23"]');
+            await page.waitForSelector('.collect-bar:not([hidden])');
+            await assertArtwork(page, true);
+            await openTray(page);
+            await page.click('.tray-views');
+            await assertArtwork(page, true);
+        }
+    }
     assert.deepEqual(errors, []);
     await ctx.close();
 });
@@ -547,10 +617,12 @@ await scenario('collection: recolor a restored page, save it, export it', async 
     await page.waitForSelector('.complete-bar:not([hidden])');
     await page.click('.complete-bar a[href="#/collect/FC01"]');
     await page.waitForSelector('.collect-bar:not([hidden])');
+    await assertArtwork(page, true);
     assert.match(await statusText(page), /自由配色/);
     const before = await page.evaluate(() => JSON.parse(localStorage.getItem('game:four-colors:v1:save')).progress.FC01.solution);
     await pickColor(page, 3);
     await tap(page, 0);
+    await assertArtwork(page, true);
     await page.click('.collect-bar .btn:nth-child(2)');
     await page.waitForTimeout(100);
     const save = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), SAVE_KEY);

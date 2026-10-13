@@ -4,9 +4,13 @@
 import { LANDMARKS } from './landmarks.js';
 import { svg } from './dom.js';
 
+// Conservative circle enclosing each path's bounding box plus its round stroke.
+// Browser regression measures the actual SVG paths against this layout contract.
+export const ART_ENVELOPE_RADIUS = 40;
+
 export const ART_SAMPLES = ['FC01', 'FC16', 'FC23', 'FC32'];
 
-// Coordinates, including control points, stay within a radius of 34 units.
+// Scenes and details share the tested envelope above.
 export const SCENES = {
     field: [
         { d: 'M-17 1 L-9 -7 L-1 1 V12 H-17 Z M1 -3 L9 -11 L17 -3 V9 H1 Z', fill: true },
@@ -57,7 +61,7 @@ export function artworkFor(level, view = level) {
         .sort((a, b) => b.radius - a.radius || a.region - b.region)
         .slice(0, level.id === 'FC01' ? 4 : 5)
         .map(({ region, x, y, radius }, k) => ({
-            region, x, y, scale: Math.min(3.5, radius * 0.78 / 34),
+            region, x, y, scale: Math.min(3.5, radius * 0.9 / ART_ENVELOPE_RADIUS),
             paths: (k % 2 ? DETAILS : SCENES)[WORLDS[level.chapter - 1]],
         }));
 }

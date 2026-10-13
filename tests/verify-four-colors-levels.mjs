@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { test, run } from './lib/harness.mjs';
 import { levelChecksum } from '../src/content/checksum.js';
 import index from '../src/content/generated/index.js';
-import { ART_SAMPLES, artworkFor, borderPaths } from '../src/render/scenery.js';
+import { ART_SAMPLES, ART_ENVELOPE_RADIUS, artworkFor, borderPaths } from '../src/render/scenery.js';
 
 const chapters = await Promise.all([1, 2, 3, 4].map(n => import(`../src/content/generated/chapter-${n}.js`).then(m => m.default)));
 const MAIN = chapters.flat();
@@ -416,7 +416,7 @@ test('sample illustrations stay inside regions and away from seals and targets',
                 assert.ok(!(lv.goals.targets || []).some(([i]) => i === region));
                 const polygon = parsePath(view.paths[region]);
                 assert.ok(inside([x, y], polygon));
-                assert.ok(distToBoundary([x, y], polygon) > 35 * scale, `${id} artwork clears its boundary`);
+                assert.ok(distToBoundary([x, y], polygon) > ART_ENVELOPE_RADIUS * scale, `${id} artwork clears its boundary`);
             }
         }
     }

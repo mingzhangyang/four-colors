@@ -6,6 +6,7 @@
 
 - [完整实现方案（持续维护的详细规格）](docs/implementation-plan.md)
 - [实现状态与验收证据](docs/implementation-status.md)
+- [体验与内容增强方案（后续设计）](docs/experience-enhancement-plan.md)
 - [部署与回滚](docs/deploy.md)
 - [四色地图示意图](docs/diagrams/fourfold-atlas-four-colors.svg)
 - [Mini Games Collection](https://github.com/mingzhangyang/games)
