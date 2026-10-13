@@ -4,11 +4,12 @@
 import { el, svg, clear, icon } from './dom.js';
 import { t, tx } from '../i18n.js';
 import { CHAPTERS, chapterById } from '../content/chapters.js';
+import { artworkSVG, chapterPlate, borderPaths } from './scenery.js';
 import { EMPTY } from '../model/rules.js';
 
 export const TABS = ['ch1', 'ch2', 'ch3', 'ch4', 'stories', 'daily', 'collection'];
 
-export function thumb(level, colors, palette, { label = '' } = {}) {
+export function thumb(level, colors, palette, { label = '', art = false } = {}) {
     const [x, y, w, h] = level.box;
     const node = svg('svg', { class: 'thumb', viewBox: `${x} ${y} ${w} ${h}`, 'aria-hidden': 'true', preserveAspectRatio: 'xMidYMid meet' });
     if (level.water) node.append(svg('rect', { class: 'thumb-sea', x, y, width: w, height: h }));
@@ -16,7 +17,9 @@ export function thumb(level, colors, palette, { label = '' } = {}) {
         const c = colors ? colors[i] : EMPTY;
         node.append(svg('path', { d, class: 'thumb-region', style: c >= 0 ? `fill:${palette[c]}` : null }));
     });
-    node.append(svg('path', { class: 'thumb-ink', d: level.outline }));
+    const borders = borderPaths(level);
+    node.append(svg('path', { class: 'thumb-ink', d: borders.inner }), svg('path', { class: 'thumb-ink thumb-outer', d: borders.outer }));
+    if (art) node.append(...artworkSVG(level, level, { thumbnail: true }));
     if (label) node.setAttribute('aria-label', label);
     return node;
 }
@@ -124,7 +127,8 @@ export function createAtlasView(ctx) {
 
     async function renderChapter(chId, token) {
         const ch = chapterById(chId);
-        const head = el('div', { class: 'chapter-head' }, [
+        const head = el('div', { class: 'chapter-head chapter-frontispiece' }, [
+            chapterPlate(chId),
             el('p', { class: 'chapter-kicker' }, [t('chapter.label', { n: chId })]),
             el('h2', { class: 'chapter-name' }, [tx(ch.name)]),
             el('p', { class: 'chapter-blurb' }, [tx(ch.blurb)]),
@@ -156,7 +160,7 @@ export function createAtlasView(ctx) {
                 const ph = holder.querySelector('.thumb-placeholder');
                 const rec = ctx.progress(lv.id);
                 const colors = rec && rec.completed && rec.solution && rec.solution.length === lv.adj.length ? rec.solution : ctx.previewColors(lv);
-                const node = thumb(lv, colors, ctx.palette(lv.chapter));
+                const node = thumb(lv, colors, ctx.palette(lv.chapter), { art: Boolean(rec && rec.completed) });
                 if (ph) ph.replaceWith(node);
             });
         } catch {
@@ -196,7 +200,7 @@ export function createAtlasView(ctx) {
                 const ph = cards[k].querySelector('.thumb-placeholder');
                 const rec = ctx.progress(lv.id);
                 const colors = rec && rec.completed && rec.solution ? rec.solution : ctx.previewColors(lv);
-                if (ph) ph.replaceWith(thumb(lv, colors, ctx.palette(lv.chapter)));
+                if (ph) ph.replaceWith(thumb(lv, colors, ctx.palette(lv.chapter), { art: Boolean(rec && rec.completed) }));
             });
         } catch { /* decoration only */ }
     }
@@ -279,7 +283,7 @@ export function createAtlasView(ctx) {
             ctx.loadAny(item.id).then(lv => {
                 if (token !== renderToken || !lv || lv.revision !== item.revision) return;
                 const ph = node.querySelector('.thumb-placeholder');
-                if (ph) ph.replaceWith(thumb(lv, item.colors, ctx.palette(lv.chapter)));
+                if (ph) ph.replaceWith(thumb(lv, item.colors, ctx.palette(lv.chapter), { art: true }));
             }).catch(() => {});
         }
     }

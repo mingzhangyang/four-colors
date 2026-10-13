@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { test, run } from './lib/harness.mjs';
 import { levelChecksum } from '../src/content/checksum.js';
 import index from '../src/content/generated/index.js';
+import { ART_SAMPLES, ART_ENVELOPE_RADIUS, artworkFor, borderPaths } from '../src/render/scenery.js';
 
 const chapters = await Promise.all([1, 2, 3, 4].map(n => import(`../src/content/generated/chapter-${n}.js`).then(m => m.default)));
 const MAIN = chapters.flat();
@@ -394,6 +395,31 @@ test('prefilled trap pages are conflict-free yet cannot be finished without repa
 
 test('water is declared as background in the legend data', () => {
     for (const lv of ALL.filter(l => l.water)) assert.ok(lv.coast.length > 0, `${lv.id} has a coastline`);
+});
+
+test('art direction preserves every compiled edge exactly once', () => {
+    const parts = d => (d.match(/M[^M]+/g) || []).map(s => s.trim()).sort();
+    for (const lv of ALL) for (const view of [lv, ...lv.views]) {
+        const { inner, outer } = borderPaths(view);
+        assert.deepEqual(parts(`${inner} ${outer}`), parts(view.outline), `${lv.id} edge partition`);
+    }
+});
+
+test('sample illustrations stay inside regions and away from seals and targets', () => {
+    for (const id of ART_SAMPLES) {
+        const lv = byId(id);
+        for (const view of [lv, ...lv.views]) {
+            const art = artworkFor(lv, view);
+            assert.ok(art.length > 0, `${id} has scenery in every view`);
+            for (const { region, x, y, scale } of art) {
+                assert.equal(lv.fixed[region], E);
+                assert.ok(!(lv.goals.targets || []).some(([i]) => i === region));
+                const polygon = parsePath(view.paths[region]);
+                assert.ok(inside([x, y], polygon));
+                assert.ok(distToBoundary([x, y], polygon) > ART_ENVELOPE_RADIUS * scale, `${id} artwork clears its boundary`);
+            }
+        }
+    }
 });
 
 await run('verify-four-colors-levels');
