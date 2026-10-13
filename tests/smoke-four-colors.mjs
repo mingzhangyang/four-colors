@@ -465,6 +465,34 @@ await scenario('multi-tab: newer progress from another tab is not silently overw
     await ctx.close();
 });
 
+await scenario('multi-tab: loading remote progress discards pending local edits', async () => {
+    const { page, ctx } = await open();
+    await waitPlay(page, 'FC01');
+    await page.evaluate(() => window.__fourColors.flushSave());
+    const other = await ctx.newPage();
+    await other.goto(BASE + '#/p/FC01');
+    await waitPlay(other, 'FC01');
+    await other.evaluate(() => {
+        const g = window.__fourColors;
+        g.commit({ type: 'fill', region: 0, color: 0 });
+        g.flushSave();
+    });
+    await page.waitForSelector('.toast-actions .btn-primary');
+    // One task guarantees the local 220ms debounce is still pending at adoption.
+    await page.evaluate(() => {
+        window.__fourColors.commit({ type: 'fill', region: 1, color: 2 });
+        document.querySelector('.toast-actions .btn-primary').click();
+    });
+    await page.waitForFunction(() => window.__fourColors.play?.state.colors[0] === 0);
+    await page.waitForTimeout(350);
+    assert.deepEqual(await colors(page), [0, -1, -1, -1]);
+    assert.deepEqual(await page.evaluate(k => JSON.parse(localStorage.getItem(k)).sessions['FC01@1'].colors, SAVE_KEY), [0, -1, -1, -1]);
+    await page.reload();
+    await waitPlay(page, 'FC01');
+    assert.deepEqual(await colors(page), [0, -1, -1, -1]);
+    await ctx.close();
+});
+
 await scenario('daily: numbered puzzles, today by UTC+8 day, kept across midnight, archive', async () => {
     const entry = manifest.entries[8]; // No.9
     const t1 = Date.parse(`${dateOfNumber(manifest, entry.no)}T15:50:00Z`); // 23:50 UTC+8 on No.9's day
@@ -535,6 +563,41 @@ await scenario('collection: recolor a restored page, save it, export it', async 
     await page.click('.collect-bar .btn-primary');
     await page.waitForSelector('.collection-card');
     assert.equal(await page.locator('.collection-card').count(), 1);
+    await ctx.close();
+});
+
+await scenario('daily collection: save, reload, thumbnail and export preserve solve records', async () => {
+    const { page, ctx } = await open({ hash: '#/daily/1', clock: new Date(dateOfNumber(manifest, 1) + 'T04:00:00Z') });
+    await waitPlay(page, 'D001');
+    await solveFromWitness(page);
+    const original = await page.evaluate(() => window.__fourColors.snapshot.progress.D001.solution.slice());
+    await page.click('.complete-bar a[href="#/collect/D001"]');
+    await page.waitForSelector('.collect-bar:not([hidden])');
+    await pickColor(page, (original[0] + 1) % 4);
+    await tap(page, 0);
+    await page.click('.collect-bar .btn:nth-child(2)');
+    const uid = await page.evaluate(() => window.__fourColors.snapshot.collection[0].uid);
+    await page.reload();
+    await page.waitForSelector('.collect-bar:not([hidden])');
+    assert.equal((await colors(page))[0], (original[0] + 1) % 4);
+    assert.deepEqual(await page.evaluate(() => window.__fourColors.snapshot.progress.D001.solution), original);
+    const download = page.waitForEvent('download');
+    await page.click('.collect-bar .btn:nth-child(3)');
+    assert.equal((await download).suggestedFilename(), 'fourfold-atlas-d001.png');
+    await page.click('.collect-bar .btn-primary');
+    await page.waitForSelector('.collection-card .card-thumb svg');
+    const cardDownload = page.waitForEvent('download');
+    await page.click('.collection-card .card-actions .btn:first-child');
+    assert.equal((await cardDownload).suggestedFilename(), 'fourfold-atlas-d001.png');
+    await page.click(`a[href="#/c/${uid}"]`);
+    await page.waitForSelector('.collect-bar:not([hidden])');
+    assert.equal((await colors(page))[0], (original[0] + 1) % 4);
+    // The collection loader must not expose unreleased daily content.
+    const futureRequests = [];
+    page.on('request', request => { if (request.url().includes('D002.r')) futureRequests.push(request.url()); });
+    await page.evaluate(() => { location.hash = '#/collect/D002'; });
+    await page.waitForFunction(() => location.hash === '#/');
+    assert.deepEqual(futureRequests, []);
     await ctx.close();
 });
 

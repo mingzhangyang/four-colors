@@ -544,4 +544,47 @@ test('hint service: a timeout or cancel stops the busy Worker; the next request 
     assert.equal(made.length, 2, 'cancelling while idle starts nothing');
 });
 
+test('distinct-color limits agree with exhaustive four-pigment completions', () => {
+    const adj = [[1, 3], [0, 2], [1, 3], [0, 2]];
+    const vectors = (base, offset) => Array.from({ length: base ** 4 }, (_, code) =>
+        Array.from({ length: 4 }, (_, i) => Math.floor(code / base ** i) % base + offset));
+    const valid = vectors(4, 0).filter(cs => findConflicts(adj, cs).length === 0);
+    for (const maxColors of [1, 2, 3, 4]) {
+        const solutions = valid.filter(cs => new Set(cs).size <= maxColors);
+        assert.equal(countSolutions(adj, { maxColors }).count, solutions.length);
+        for (const preset of vectors(5, -1)) {
+            const expected = solutions.filter(cs => preset.every((c, i) => c === EMPTY || c === cs[i]));
+            assert.equal(isExtendable(adj, preset, { maxColors }).extendable, expected.length > 0);
+            const nearest = nearestSolution(adj, preset, { maxColors });
+            const cost = Math.min(...solutions.map(cs => preset.filter((c, i) => c !== EMPTY && c !== cs[i]).length));
+            assert.equal(nearest.cost, cost);
+            assert.equal(nearest.optimal, true);
+        }
+    }
+    assert.deepEqual(viableCandidates(adj, [-1, 2, 3, 2], { maxColors: 2 }), [8, 0, 0, 0]);
+    assert.equal(isExtendable(adj, [3, -1, -1, -1], { k: 2 }).extendable, false, 'canonical palette semantics stay unchanged');
+    assert.equal(isExtendable(adj, [3, -1, -1, -1], { maxColors: 2 }).extendable, true);
+    assert.equal(nearestSolution(adj, [-1, -1, -1, -1], { maxColors: 2, fixed: [3, 2, -1, -1] }).solution[0], 3);
+    assert.equal(nearestSolution(adj, [-1, -1, -1, -1], { maxColors: 2, fixed: [3, 2, 1, -1] }).solution, null);
+});
+
+test('fewer-color hints preserve all valid pigment choices and fixed stamps', async () => {
+    const { default: stories } = await import('../src/content/generated/stories.js');
+    for (const level of stories.filter(lv => lv.goals.maxColors)) {
+        for (const permutation of [[3, 2, 1, 0], [0, 3, 2, 1], [2, 1, 3, 0]]) {
+            const puzzle = { ...level, fixed: level.fixed.map(c => c < 0 ? c : permutation[c]) };
+            const solution = level.witness.map(c => permutation[c]);
+            const region = puzzle.fixed.findIndex(c => c < 0);
+            const colors = solution.slice();
+            colors[region] = EMPTY;
+            assert.ok(isValidSolution(puzzle, solution));
+            assert.equal(computeHint(puzzle, colors, 1).key, 'hint.lookRegion');
+            const h = computeHint(puzzle, colors, 3);
+            const completed = colors.slice();
+            completed[h.suggestion.region] = h.suggestion.color;
+            assert.ok(isValidSolution(puzzle, completed), level.id);
+        }
+    }
+});
+
 await run('verify-four-colors-rules');

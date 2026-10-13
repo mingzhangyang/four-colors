@@ -16,7 +16,8 @@ function popcount(mask) {
  * Enumerate colorings.
  * @param {number[][]} adj
  * @param {object} opts
- *   k          number of colors allowed (1–4)
+ *   k          palette size: color IDs 0…k-1 (1–4)
+ *   maxColors  maximum distinct colors used from that palette (default k)
  *   preset     array of EMPTY or color: assignments that must hold
  *   limit      stop after this many solutions
  *   nodeLimit  search budget (assignments tried)
@@ -27,6 +28,7 @@ function popcount(mask) {
 export function solve(adj, opts = {}) {
     const {
         k = COLOR_COUNT,
+        maxColors = k,
         preset = null,
         limit = 1,
         nodeLimit = 2_000_000,
@@ -121,8 +123,8 @@ export function solve(adj, opts = {}) {
         return out;
     }
 
-    function dfs(maxUsed) {
-        if (aborted || count >= limit) return;
+    function dfs(maxUsed, usedMask) {
+        if (aborted || count >= limit || popcount(usedMask) > maxColors) return;
         const v = pick();
         if (v === -1) {
             count++;
@@ -130,16 +132,18 @@ export function solve(adj, opts = {}) {
             return;
         }
         for (const c of values(v, maxUsed)) {
+            const nextMask = usedMask | (1 << c);
+            if (popcount(nextMask) > maxColors) continue;
             if (++nodes > nodeLimit) { aborted = true; return; }
             const mark = trail.length;
-            if (assign(v, c)) dfs(Math.max(maxUsed, c));
+            if (assign(v, c)) dfs(Math.max(maxUsed, c), nextMask);
             undoTo(mark);
             color[v] = EMPTY;
             if (aborted || count >= limit) return;
         }
     }
 
-    dfs(-1);
+    dfs(-1, color.reduce((mask, c) => c === EMPTY ? mask : mask | (1 << c), 0));
     return { count, solutions, exhausted: !aborted && count < limit, nodes, aborted };
 }
 
@@ -191,7 +195,7 @@ export function viableCandidates(adj, colors, opts = {}) {
  * player's current (non-fixed) regions. `fixed` regions never change.
  */
 export function nearestSolution(adj, colors, opts = {}) {
-    const { k = COLOR_COUNT, fixed = null, nodeLimit = 400_000 } = opts;
+    const { k = COLOR_COUNT, maxColors = k, fixed = null, nodeLimit = 400_000 } = opts;
     const n = adj.length;
     const full = (1 << k) - 1;
     const color = new Int8Array(n).fill(EMPTY);
@@ -239,8 +243,8 @@ export function nearestSolution(adj, colors, opts = {}) {
         }
         return bestV;
     }
-    function dfs(cost) {
-        if (aborted || cost >= bestCost) return;
+    function dfs(cost, usedMask) {
+        if (aborted || cost >= bestCost || popcount(usedMask) > maxColors) return;
         const v = pick();
         if (v === -1) {
             bestCost = cost;
@@ -252,17 +256,19 @@ export function nearestSolution(adj, colors, opts = {}) {
         if (cur !== EMPTY && (dom[v] & (1 << cur))) order.push(cur);
         for (let c = 0; c < k; c++) if (c !== cur && (dom[v] & (1 << c))) order.push(c);
         for (const c of order) {
+            const nextMask = usedMask | (1 << c);
+            if (popcount(nextMask) > maxColors) continue;
             if (++nodes > nodeLimit) { aborted = true; return; }
             const step = cur !== EMPTY && c !== cur ? 1 : 0;
             if (cost + step >= bestCost) continue;
             const mark = trail.length;
-            if (assign(v, c)) dfs(cost + step);
+            if (assign(v, c)) dfs(cost + step, nextMask);
             undoTo(mark);
             color[v] = EMPTY;
             if (aborted) return;
         }
     }
-    dfs(0);
+    dfs(0, color.reduce((mask, c) => c === EMPTY ? mask : mask | (1 << c), 0));
     return { solution: best, cost: bestCost, optimal: !aborted };
 }
 

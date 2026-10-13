@@ -262,7 +262,7 @@ export function createAtlasView(ctx) {
         panel.append(grid);
         for (const item of items) {
             const entry = ctx.index.main.find(l => l.id === item.id) || ctx.index.stories.find(l => l.id === item.id);
-            const name = entry ? tx(entry.name) : item.id;
+            const name = entry ? tx(entry.name) : /^D\d+$/.test(item.id) ? t('daily.number', { no: Number(item.id.slice(1)) }) : item.id;
             const date = new Date(item.savedAt).toLocaleDateString();
             const node = el('div', { class: 'level-card collection-card' }, [
                 el('a', { class: 'card-thumb', href: `#/c/${item.uid}`, 'aria-label': `${t('collection.open')} ${name}` }, [el('div', { class: 'thumb-placeholder' })]),
