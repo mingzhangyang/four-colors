@@ -117,6 +117,48 @@ async function dispatchPointer(page, i, type, { id = 1, dx = 0, dy = 0 } = {}) {
 
 console.log('smoke-four-colors');
 
+await scenario('optional Analytics V2 tracks real attempts, not atlas or passive puzzle opens', async () => {
+    const { page, ctx, errors } = await open({
+        init: () => {
+            window.__analyticsEvents = [];
+            window.hubTrack = (game, event) => window.__analyticsEvents.push({ game, event });
+        },
+    });
+    await waitPlay(page, 'FC01');
+    const inspect = () => page.evaluate(() => ({
+        events: window.__analyticsEvents.map(e => e.event),
+        playing: Boolean(window.__gamesAnalyticsPlaying.get('four-colors')()),
+    }));
+    assert.deepEqual(await inspect(), { events: [], playing: false });
+
+    // Choosing a pigment and clicking a non-actionable area must not count.
+    await pickColor(page, 0);
+    assert.deepEqual(await inspect(), { events: [], playing: false });
+    await page.evaluate(() => window.__fourColors.commit({ type: 'fill', region: 0, color: 0 }));
+    assert.deepEqual(await inspect(), { events: ['play'], playing: true });
+    await page.evaluate(() => window.__fourColors.commit({ type: 'fill', region: 0, color: 0 }));
+    assert.deepEqual(await inspect(), { events: ['play'], playing: true });
+
+    await page.evaluate(() => window.__fourColors.commit({ type: 'restart' }));
+    assert.deepEqual(await inspect(), { events: ['play'], playing: false });
+    await solveFromWitness(page);
+    await page.waitForSelector('.complete-bar:not([hidden])');
+    assert.deepEqual(await inspect(), {
+        events: ['play', 'play', 'finish'],
+        playing: false,
+    });
+
+    // Saved completion is a view, not a newly completed run.
+    await page.reload();
+    await waitPlay(page, 'FC01');
+    assert.deepEqual(await inspect(), { events: [], playing: false });
+    await page.evaluate(() => { location.hash = '#/atlas/ch1'; });
+    await page.waitForSelector('.atlas');
+    assert.deepEqual(await inspect(), { events: [], playing: false });
+    assert.deepEqual(errors, []);
+    await ctx.close();
+});
+
 await scenario('first visit opens page one directly and teaches by doing', async () => {
     const { page, ctx, errors } = await open();
     await waitPlay(page, 'FC01');

@@ -21,6 +21,7 @@ import {
 } from './services/daily.js';
 import { renderPage, renderMosaic, downloadCanvas, stampPattern } from './services/export.js';
 import { sessionKey, MAX_SESSIONS, MAX_COLLECTION, MAX_IDLE_HISTORY, MAX_SAVED_HISTORY } from './storage.js';
+import { createAnalytics } from './services/analytics.js';
 
 const GAMES_URL = 'https://games.orangely.xyz/';
 const SITE_URL = 'https://four-colors.orangely.xyz/';
@@ -38,6 +39,21 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
     let sessionSeq = 0;
     let routeToken = 0;
     let newDayShown = false;
+    let analyticsStarted = false;
+    const analytics = createAnalytics('four-colors', () =>
+        analyticsStarted && view === 'play' && play && play.kind !== 'collect'
+        && !play.complete && !settingsDialog.open && !regionsDialog.open,
+    );
+    function beginAttempt() {
+        if (analyticsStarted) return;
+        analyticsStarted = true;
+        analytics.play();
+    }
+    function finishAttempt() {
+        if (!analyticsStarted) return;
+        analytics.finish();
+        analyticsStarted = false;
+    }
 
     // ───────────────────────── shell ─────────────────────────
     const topbar = el('header', { class: 'topbar' });
@@ -514,6 +530,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
 
     function leavePlay() {
         if (!play) return;
+        analyticsStarted = false;
         hints.cancelAll();
         pointer.cancel();
         if (saveTimer) flushSave();
@@ -585,6 +602,7 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
     }
 
     function mountPlay({ level, kind, collectItem }) {
+        analyticsStarted = false;
         let colorsSeed = null;
         if (kind === 'collect') {
             const rec = snap.progress[level.id];
@@ -875,6 +893,10 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
         p.eval = evaluate(p.puzzle, p.state.colors);
         const wasComplete = p.complete;
         p.complete = p.kind !== 'collect' && p.eval.complete;
+        // Only successful, meaningful puzzle edits start an attempt. Tool selections,
+        // hint requests, collection recoloring and restarts never count as play.
+        if (cmd.type === 'restart') analyticsStarted = false;
+        else if (!wasComplete && p.kind !== 'collect' && res.changes.length) beginAttempt();
         // projections
         if (cmd.type === 'fill' && res.changes.length) {
             const [i, from, to] = res.changes[0];
@@ -892,7 +914,11 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
             if (res.entry && res.entry.k === 'swap') map.animateSwap(res.changes.map(([i, b]) => [i, b]));
             announcer.say(t(cmd.type === 'undo' ? 'a11y.undo' : 'a11y.redo'));
         }
-        if (p.complete && !wasComplete) onComplete();
+        if (p.complete && !wasComplete) {
+            beginAttempt(); // handles single-step completion after restoring a partial save
+            onComplete();
+            finishAttempt();
+        }
         if (!p.complete && wasComplete) {
             map.revealArt(false);
             pageEl.classList.remove('celebrate');
