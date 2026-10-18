@@ -95,7 +95,6 @@ export function emptySnapshot() {
 const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
 const isColorArr = (a, max = 64) => Array.isArray(a) && a.length <= max && a.every(c => Number.isInteger(c) && c >= -1 && c <= 3);
 const isId = v => typeof v === 'string' && /^[A-Z][A-Z0-9]{0,8}$/.test(v);
-const isDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const isRev = v => Number.isInteger(v) && v >= 1 && v < 1000;
 
 /** Write header of a stored snapshot, normalised exactly as `validateSnapshot` adopts it. */
@@ -151,10 +150,10 @@ export function validateSnapshot(raw) {
         }
     }
     if (isObj(raw.daily)) {
-        // session: the numbered daily last opened and the UTC+8 date it was opened on
+        // Resume numbered sessions from old saves; ignore the legacy calendar date.
         const s = raw.daily.session;
-        if (isObj(s) && isDate(s.date) && isId(s.id) && isRev(s.revision) && Number.isInteger(s.no) && s.no >= 1 && s.no < 100000) {
-            snap.daily.session = { date: s.date, no: s.no, id: s.id, revision: s.revision };
+        if (isObj(s) && isId(s.id) && isRev(s.revision) && Number.isInteger(s.no) && s.no >= 1 && s.no < 100000) {
+            snap.daily.session = { no: s.no, id: s.id, revision: s.revision };
         }
         // records are keyed by the numbered puzzle id (D001 …), never by date
         if (isObj(raw.daily.records)) {

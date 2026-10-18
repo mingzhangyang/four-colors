@@ -10,15 +10,15 @@
 //     → daily bank           public/daily/*.json + src/content/generated/daily-manifest.js (numbered No.1…N)
 //
 // `--check` regenerates everything in memory and fails if any committed file
-// differs, if a level's topology changed without a revision bump, or if a dated
-// daily entry would be rewritten.
+// differs, if a level's topology changed without a revision bump, or if a
+// numbered puzzle's immutable content would be rewritten.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { MAIN, STORIES, CHAPTER_ART } from '../levels/main.mjs';
-import { dailySpecs, DAILY_EPOCH } from '../levels/daily.mjs';
+import { dailySpecs } from '../levels/daily.mjs';
 import { grid2x2, k4Disc, hexRing, bands, warpFn, combineMeshes, PAGE } from '../levels/shapes.mjs';
 import { voronoiPage, chordPage } from '../lib/mapgen.mjs';
 import { buildMesh, MeshError } from '../lib/mesh-build.mjs';
@@ -548,13 +548,11 @@ function main() {
         seen.set(sig, lv.id);
     }
 
-    // daily manifest: numbered puzzles, immutable once released; the epoch is locked too
-    const dailyLock = readJson('content/daily-lock.json', { epoch: null, entries: [] });
+    // All numbered puzzles are accessible. Retain historical lock metadata
+    // without putting its old epoch into the runtime manifest.
+    const dailyLock = readJson('content/daily-lock.json', { note: 'Numbered entries are immutable. Append only.', entries: [] });
     const lockedByNo = new Map(dailyLock.entries.map(e => [e.no, e]));
     const manifestEntries = daily.map(lv => ({ no: lv.no, id: lv.id, revision: lv.revision, checksum: lv.checksum }));
-    if (dailyLock.epoch && dailyLock.epoch !== DAILY_EPOCH) {
-        problems.push(`daily epoch is locked to ${dailyLock.epoch}; changing it to ${DAILY_EPOCH} would shift which number is “today” for every player`);
-    }
     manifestEntries.forEach((e, i) => {
         if (e.no !== i + 1) problems.push(`daily numbers must be consecutive from 1 (found No.${e.no} at position ${i + 1})`);
         const old = lockedByNo.get(e.no);
@@ -575,16 +573,15 @@ function main() {
         stories: stories.map(l => ({ id: l.id, revision: l.revision, chapter: l.chapter, index: l.index, name: l.name, regions: l.adj.length, tags: l.tags, checksum: l.checksum })),
     };
     emit('src/content/generated/index.js', moduleText('Level index: ids, names and checksums.', index));
-    emit('src/content/generated/daily-manifest.js', moduleText('Numbered daily puzzles. Today = UTC+8 days since epoch + 1. Immutable once released (content/daily-lock.json).', {
-        version: 2,
-        epoch: DAILY_EPOCH,
+    emit('src/content/generated/daily-manifest.js', moduleText('Numbered puzzle bank. All numbers available; IDs and revisions immutable (content/daily-lock.json).', {
+        version: 3,
         entries: manifestEntries,
     }));
     for (const lv of daily) emit(`public/daily/${lv.id}.r${lv.revision}.json`, `${JSON.stringify(lv)}\n`);
     emit('docs/level-report.md', levelReport(mainLevels, stories, daily, masters, dailyMasters));
     emit('content/master/levels.json', `${JSON.stringify({ generator: 1, levels: masters })}\n`);
     emit('content/master/daily.json', `${JSON.stringify({ generator: 1, levels: dailyMasters })}\n`);
-    emit('content/daily-lock.json', `${JSON.stringify({ note: 'Released daily numbers are immutable and the epoch never moves after launch. Append only.', epoch: DAILY_EPOCH, entries: manifestEntries }, null, 1)}\n`);
+    emit('content/daily-lock.json', `${JSON.stringify({ note: dailyLock.note, ...(dailyLock.epoch ? { epoch: dailyLock.epoch } : {}), entries: manifestEntries }, null, 1)}\n`);
     emit('tools/levels/revisions.lock.json', `${JSON.stringify(nextLock, null, 1)}\n`);
 
     if (problems.length) {

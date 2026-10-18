@@ -1,11 +1,7 @@
-// Daily bank specification: numbered puzzles No.1 … No.N, generated offline
-// and reviewed. Puzzles are not tied to calendar dates. One runtime rule picks
-// "today": No. = (UTC+8 days since DAILY_EPOCH) + 1, so everyone gets the same
-// number on the same day and a later launch never requires regenerating
-// content. Released numbers are immutable (content/daily-lock.json, append
-// only); the epoch is locked there too once the site is live.
+// Numbered puzzle bank: No.1…No.N are available immediately.
+// Puzzle IDs, revisions and checksums stay immutable. Historical epoch metadata
+// in content/daily-lock.json is for audit only; it never gates access.
 
-export const DAILY_EPOCH = '2026-10-13';
 export const DAILY_COUNT = 60;
 
 const STYLES = [
@@ -45,6 +41,7 @@ export function dailySpecs() {
             revision: 1,
             no,
             chapter: style.chapter,
+            // Legacy level metadata stays unchanged to preserve puzzle checksums.
             name: { zh: `每日 No.${no}`, en: `Daily No.${no}` },
             gen,
             actions: ['fill', 'erase', 'swap'],

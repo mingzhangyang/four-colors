@@ -1,14 +1,14 @@
 # 部署与回滚
 
-四色图志以 Cloudflare Workers 静态资源方式部署（`wrangler.jsonc`，无服务端代码），正式地址 **https://four-colors.orangely.xyz**。部署由 **Cloudflare Workers Builds** 关联本 GitHub 仓库自动完成：推送到 `main` 即构建并发布正式站点，其他分支只上传预览版本。单款更新只走本仓库，不触发 games 或其他游戏的发布。
+四色图志以 Cloudflare Workers 静态资源方式部署（`wrangler.jsonc`，无服务端代码），正式地址 **https://four-colors.orangely.xyz**。
 
-## 一次性关联（在 Cloudflare 控制台完成）
+2026-10-17 的 Cloudflare 部署记录显示：**已有 `four-colors` Worker、生产部署和自定义域名**，最近生产版本由 Wrangler 发布。但未找到该 Worker 的 GitHub Workers Builds 构建记录和触发器。已部署不代表 Git 自动部署已建立，也不代表已经完成公网、手机和读屏验收。**不要再创建同名 Worker，也不要删除其现有 DNS 记录。**
 
-前提：`orangely.xyz` 这个 zone 在同一个 Cloudflare 账户下（games 已使用该账户）。若 DNS 里已有名为 `four-colors` 的记录，先删除，自定义域名会自动创建 DNS 记录与证书。
+## 在现有 Worker 上关联 GitHub（一次性）
 
-1. Workers & Pages → **Create** → **Import a repository** → 授权 GitHub 并选择 `mingzhangyang/four-colors`。
-2. 项目名填 **`four-colors`**（必须与 `wrangler.jsonc` 的 `name` 一致）。
-3. Build settings：
+1. Cloudflare → **Workers & Pages** → 选择已存在的 **`four-colors`**。
+2. 打开 **Settings → Builds → Connect**，授权 GitHub 后选 `mingzhangyang/four-colors`；不要走创建新 Worker 的入口。
+3. 核对现有 Worker 的名称与 `wrangler.jsonc` 的 `name` 都为 `four-colors`。配置：
 
    | 字段 | 值 |
    | --- | --- |
@@ -18,10 +18,10 @@
    | Non-production branch deploy command | `npx wrangler versions upload` |
    | Root directory | `/` |
 
-   Node 版本由仓库根目录的 `.node-version`（22）决定；依赖由 Workers Builds 按 `package-lock.json` 安装。`build:cloudflare` 会先跑内容一致性检查与模型/关卡/每日测试再构建，任何一项失败都不会部署。
-4. 保存并触发首次构建。`wrangler deploy` 读取 `routes` 中的 `four-colors.orangely.xyz`（`custom_domain: true`）并绑定自定义域名；`workers.dev` 子域已关闭，PR/分支构建会得到预览 URL。
+4. Node 22 来自 `.node-version`；`build:cloudflare` 做内容锁校验、规则测试和构建。Chromium smoke 由 GitHub Actions 检查（Wrangler dry-run 不是部署证据）。
+5. 经 CI 验证的 PR 合并到 `main` 后，在 Workers Builds 页面核对源 Git SHA、成功部署版本和生产流量，随后验证自定义域名。不要从旧本地 `dist` 重复手工部署。
 
-浏览器 smoke 测试需要 Chromium，放在 GitHub Actions CI（`.github/workflows/ci.yml`）里跑；建议在 GitHub 分支保护中把 CI 设为合并 `main` 的必需检查，这样进入 `main` 的提交都已通过完整回归。
+Cloudflare 官方文档：https://developers.cloudflare.com/workers/ci-cd/builds/
 
 ## 发布前验收
 
@@ -35,7 +35,7 @@
 - 本地 `npx wrangler rollback`（需要账户权限）；或
 - 在 `main` 上 revert 有问题的提交，Workers Builds 会自动重新部署。
 
-每日题库文件按 `D###.r<revision>.json` 命名且不可变，回滚代码不会改变已发布的每日地图；`content/daily-lock.json` 只允许追加，且锁定起始日（epoch）。
+编号题库文件按 `D###.r<revision>.json` 命名且不可变；本次改版允许 60 个编号全部自由访问，历史 `content/daily-lock.json` 的 epoch 仅用于审计，不再决定开放资格。回滚到旧应用版本会恢复旧代码的日期开放限制（不会删除已保存的完成记录），请评估这一行为变化。
 
 ## 缓存
 

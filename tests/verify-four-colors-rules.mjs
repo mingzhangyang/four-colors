@@ -425,9 +425,11 @@ test('snapshot validation drops corrupted parts', () => {
     assert.equal(v.progress.FC01.completed, true);
     assert.equal(v.progress.FC01.independent, false);
     assert.equal(Object.keys(v.progress).length, 1);
-    assert.deepEqual(v.daily.session, { date: '2026-10-13', no: 1, id: 'D001', revision: 1 });
+    assert.deepEqual(v.daily.session, { no: 1, id: 'D001', revision: 1 }, 'legacy date is discarded safely');
     assert.deepEqual(Object.keys(v.daily.records), ['D001'], 'daily records are keyed by numbered puzzle id');
     assert.equal(validateSnapshot({ ...raw, daily: { session: { date: '2026-10-13', id: 'D001', revision: 1 } } }).daily.session, null, 'a session without its number is dropped');
+    assert.deepEqual(validateSnapshot({ ...raw, daily: { session: { no: 2, id: 'D002', revision: 1 } } }).daily.session,
+        { no: 2, id: 'D002', revision: 1 }, 'new date-free sessions persist');
     assert.equal(v.collection.length, 1);
     assert.equal(validateSnapshot('garbage').schema, 1);
     assert.equal(validateSnapshot({ schema: 99 }).current, null);

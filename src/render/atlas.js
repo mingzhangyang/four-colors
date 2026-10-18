@@ -106,7 +106,6 @@ export function createAtlasView(ctx) {
                 tabindex: selected ? '0' : '-1',
                 onclick: () => ctx.setTab(tab),
             }, [tab.startsWith('ch') ? el('span', { class: 'tab-num' }, [tab.slice(2)]) : null, el('span', { class: 'tab-text' }, [tabLabel(tab)])]);
-            if (ctx.tabBadge(tab)) b.append(el('span', { class: 'tab-badge', 'aria-hidden': 'true' }));
             tabs.append(b);
         }
         panel.setAttribute('aria-labelledby', `tab-${ctx.tab()}`);
@@ -210,40 +209,34 @@ export function createAtlasView(ctx) {
         const box = el('div', { class: 'daily' });
         panel.append(el('div', { class: 'chapter-head' }, [
             el('h2', { class: 'chapter-name' }, [t('daily.title')]),
-            el('p', { class: 'chapter-blurb' }, [t('daily.records', { n: info.restoredDays, total: info.total })]),
+            el('p', { class: 'chapter-blurb' }, [t('daily.records', { n: info.restoredMaps, total: info.total })]),
         ]), box);
-        if (info.newDay) box.append(el('p', { class: 'notice' }, [t('daily.newDay')]));
-        if (info.status.state === 'today') {
-            const rec = info.todayRecord;
-            const no = info.status.no;
+        if (info.allDone) box.append(el('p', { class: 'notice' }, [t('daily.allDone')]));
+        if (info.recommended) {
+            const entry = info.recommended;
+            const rec = info.selectedRecord;
             box.append(el('div', { class: 'daily-card' }, [
-                el('div', { class: 'daily-date' }, [icon('calendar'), el('span', {}, [t('daily.today', { no })])]),
-                el('p', { class: 'daily-state' }, [t('daily.dateLine', { date: info.today }), rec && rec.completed ? ` · ${rec.assisted ? t('daily.doneAssisted') : t('daily.done')}` : '']),
-                el('a', { class: 'btn btn-primary', href: `#/daily/${no}` }, [rec && rec.completed ? t('complete.stay') : (info.todayStarted ? t('daily.continue') : t('daily.play'))]),
-                el('p', { class: 'daily-next' }, [t('daily.next', { time: info.countdown })]),
+                el('div', { class: 'daily-date' }, [icon('book'), el('span', {}, [t('daily.featured', { no: entry.no })])]),
+                rec && rec.completed
+                    ? el('p', { class: 'daily-state' }, [rec.assisted ? t('daily.doneAssisted') : t('daily.done')])
+                    : null,
+                el('a', { class: 'btn btn-primary', href: `#/daily/${entry.no}` }, [
+                    info.allDone ? t('daily.replay') : info.started ? t('daily.continue') : t('daily.play'),
+                ]),
             ]));
-        } else if (info.status.state === 'before') {
-            box.append(el('p', { class: 'notice' }, [t('daily.beforeStart', { date: info.status.startDate })]));
-        } else {
-            box.append(el('p', { class: 'notice' }, [t('daily.expired', { total: info.total })]));
         }
-        if (info.unfinishedOld) {
-            box.append(el('p', {}, [el('a', { class: 'btn', href: `#/daily/${info.unfinishedOld.no}` }, [t('daily.unfinished', { no: info.unfinishedOld.no })])]));
-        }
-        if (info.archive.length) {
-            const grid = el('div', { class: 'daily-archive' });
-            box.append(el('h3', { class: 'section-title' }, [t('daily.archive')]), grid);
-            for (const e of info.archive) {
-                const done = e.record && e.record.completed;
-                grid.append(el('a', {
-                    class: `daily-tile${done ? ' is-done' : ''}`,
-                    href: `#/daily/${e.no}`,
-                    'aria-label': `${t('daily.number', { no: e.no })}${done ? ` · ${t('level.completed')}` : ''}`,
-                }, [
-                    el('span', { class: 'daily-tile-no' }, [`No.${e.no}`]),
-                    done ? el('span', { class: `daily-tile-mark${e.record.assisted ? '' : ' independent'}` }, [icon('check')]) : null,
-                ]));
-            }
+        const grid = el('div', { class: 'daily-archive' });
+        box.append(el('h3', { class: 'section-title' }, [t('daily.archive')]), grid);
+        for (const e of info.entries) {
+            const done = e.record && e.record.completed;
+            grid.append(el('a', {
+                class: `daily-tile${done ? ' is-done' : ''}`,
+                href: `#/daily/${e.no}`,
+                'aria-label': `${t('daily.number', { no: e.no })}${done ? ` · ${t('level.completed')}` : ''}`,
+            }, [
+                el('span', { class: 'daily-tile-no' }, [`No.${e.no}`]),
+                done ? el('span', { class: `daily-tile-mark${e.record.assisted ? '' : ' independent'}` }, [icon('check')]) : null,
+            ]));
         }
     }
 
