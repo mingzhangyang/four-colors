@@ -56,6 +56,8 @@ public/daily/*.json            编号每日题库（No.1…），按 revision �
 tests/                         模型、内容、每日与浏览器回归
 ```
 
-## 独立性
+## 独立性与匿名访问统计
 
-本仓库自带构建、依赖、设置、版本化存档、UTC+8 每日编号规则与 CI；不加载 games 的 CSS、运行时或远程脚本。返回合集使用固定链接 `https://games.orangely.xyz/`。语言与主题可由 `?lang=en|zh`、`?theme=light|dark|system` 初始化，已保存的偏好优先，声音默认静音且不经 URL 传递。
+本仓库自带构建、依赖、设置、版本化存档、UTC+8 每日编号规则与 CI；核心游戏不依赖合集的 CSS 或运行时。仅在正式域名可选异步加载 `games` 的 Analytics V2 客户端；预览和 localhost 不加载。客户端匿名统计页面打开、前台活跃时长，以及用户首次有效着色/擦除/交换后的实际游玩时长与关卡完成次数。查看地图册、进入收藏、选择颜料、提示、重开和恢复已通关存档均不计对局；退出关卡或完成后结束游玩计时。不使用 Cookie、账号或独立数据库，网络故障不会影响游戏。统计 Worker 的新外站 ID 与 CORS 来源必须先部署，详情见 games PR #152。
+
+返回合集使用固定链接 `https://games.orangely.xyz/`。语言与主题可由 `?lang=en|zh`、`?theme=light|dark|system` 初始化，已保存的偏好优先，声音默认静音且不经 URL 传递。
