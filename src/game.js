@@ -42,7 +42,9 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
     let analyticsStarted = false;
     const analytics = createAnalytics('four-colors', () =>
         analyticsStarted && view === 'play' && play && play.kind !== 'collect'
-        && !play.complete && !settingsDialog.open && !regionsDialog.open,
+        // The regions sheet is an interactive puzzle surface: it permits real fills.
+        // Only the settings dialog (and a solved or non-play view) pauses gameplay.
+        && !play.complete && !settingsDialog.open,
     );
     function beginAttempt() {
         if (analyticsStarted) return;
@@ -871,6 +873,9 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
         if (!play) return null;
         const p = play;
         const before = p.state;
+        // Restart is an attempt boundary even when the colors are already at their
+        // initial values: execute() intentionally returns "noop" in that case.
+        if (cmd.type === 'restart') analyticsStarted = false;
         const res = execute(p.puzzle, before, cmd);
         if (!res.ok) {
             if (res.reason === 'fixed') { p.override = t('status.fixed'); audio.play('blocked'); }
@@ -893,10 +898,11 @@ export function createGame({ root, storage, saves, settings, hints, audio, now =
         p.eval = evaluate(p.puzzle, p.state.colors);
         const wasComplete = p.complete;
         p.complete = p.kind !== 'collect' && p.eval.complete;
-        // Only successful, meaningful puzzle edits start an attempt. Tool selections,
-        // hint requests, collection recoloring and restarts never count as play.
-        if (cmd.type === 'restart') analyticsStarted = false;
-        else if (!wasComplete && p.kind !== 'collect' && res.changes.length) beginAttempt();
+        // Real edits that leave the puzzle unsolved start/restart an attempt, even
+        // when undoing a previously completed result. Tool choices, no-op inputs,
+        // collection edits and restart never count as play.
+        if (cmd.type !== 'restart' && p.kind !== 'collect'
+            && res.changes.length && !p.complete) beginAttempt();
         // projections
         if (cmd.type === 'fill' && res.changes.length) {
             const [i, from, to] = res.changes[0];

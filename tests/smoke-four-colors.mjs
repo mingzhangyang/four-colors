@@ -139,22 +139,60 @@ await scenario('optional Analytics V2 tracks real attempts, not atlas or passive
     await page.evaluate(() => window.__fourColors.commit({ type: 'fill', region: 0, color: 0 }));
     assert.deepEqual(await inspect(), { events: ['play'], playing: true });
 
-    await page.evaluate(() => window.__fourColors.commit({ type: 'restart' }));
+    // Undo all paint so restart is a valid button action but a model no-op.
+    await page.evaluate(() => window.__fourColors.commit({ type: 'undo' }));
+    assert.deepEqual(await inspect(), { events: ['play'], playing: true });
+    const noOp = await page.evaluate(() => window.__fourColors.commit({ type: 'restart' }));
+    assert.equal(noOp.ok, false, 'restoring initial colors makes restart a model no-op');
+    assert.equal(noOp.reason, 'noop');
     assert.deepEqual(await inspect(), { events: ['play'], playing: false });
+
+    // A fresh edit after even a no-op restart begins a distinct attempt.
+    await page.evaluate(() => window.__fourColors.commit({ type: 'fill', region: 0, color: 0 }));
+    assert.deepEqual(await inspect(), { events: ['play', 'play'], playing: true });
+
+    // Regions sheet contains real paint commands, not an inactive settings menu.
+    await openTray(page);
+    await page.click('.tray-regions');
+    assert.equal(await page.locator('.regions-sheet').isVisible(), true);
+    assert.deepEqual(await inspect(), { events: ['play', 'play'], playing: true });
+    await page.locator('.regions-sheet .region-row').nth(1).locator('.region-actions button').last().click();
+    assert.equal((await colors(page))[1], 0, 'regions sheet commits a valid fill');
+    assert.deepEqual(await inspect(), { events: ['play', 'play'], playing: true });
+    await page.locator('.regions-sheet .sheet-actions button').click();
+
+    // Non-noop restart ends an unfinished attempt; completion sends finish once.
+    await page.evaluate(() => window.__fourColors.commit({ type: 'restart' }));
+    assert.deepEqual(await inspect(), { events: ['play', 'play'], playing: false });
     await solveFromWitness(page);
     await page.waitForSelector('.complete-bar:not([hidden])');
     assert.deepEqual(await inspect(), {
-        events: ['play', 'play', 'finish'],
+        events: ['play', 'play', 'play', 'finish'],
+        playing: false,
+    });
+    // Undo from a solved puzzle is an immediate new attempt, not a passive view.
+    await page.evaluate(() => window.__fourColors.commit({ type: 'undo' }));
+    assert.deepEqual(await inspect(), {
+        events: ['play', 'play', 'play', 'finish', 'play'],
+        playing: true,
+    });
+    await page.evaluate(() => window.__fourColors.commit({ type: 'redo' }));
+    assert.deepEqual(await inspect(), {
+        events: ['play', 'play', 'play', 'finish', 'play', 'finish'],
         playing: false,
     });
 
-    // Saved completion is a view, not a newly completed run.
+    // A restored completion stays passive until an actual edit makes it unsolved.
     await page.reload();
     await waitPlay(page, 'FC01');
     assert.deepEqual(await inspect(), { events: [], playing: false });
+    await page.evaluate(() => window.__fourColors.commit({ type: 'undo' }));
+    assert.deepEqual(await inspect(), { events: ['play'], playing: true });
+    await page.evaluate(() => window.__fourColors.commit({ type: 'redo' }));
+    assert.deepEqual(await inspect(), { events: ['play', 'finish'], playing: false });
     await page.evaluate(() => { location.hash = '#/atlas/ch1'; });
     await page.waitForSelector('.atlas');
-    assert.deepEqual(await inspect(), { events: [], playing: false });
+    assert.deepEqual(await inspect(), { events: ['play', 'finish'], playing: false });
     assert.deepEqual(errors, []);
     await ctx.close();
 });
