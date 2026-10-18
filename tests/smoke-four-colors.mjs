@@ -3,7 +3,7 @@
 // keyboard, pointer edge cases (cancel, two fingers, drag, long press), the
 // two-color swap (preview, locks, conflicts), hints (layers, stale replies,
 // timeout), visible-viewport fit, settings precedence, storage failure,
-// multi-tab conflicts, the daily lock across midnight, the collection,
+// multi-tab conflicts, unrestricted numbered-map access, the collection,
 // reduced motion, lifecycle saving and main-thread budgets.
 
 import assert from 'node:assert/strict';
@@ -12,7 +12,6 @@ import { chromium } from 'playwright';
 import { startServer } from './lib/serve.mjs';
 import { ART_SAMPLES, ART_ENVELOPE_RADIUS } from '../src/render/scenery.js';
 import manifest from '../src/content/generated/daily-manifest.js';
-import { dateOfNumber } from '../src/services/daily.js';
 
 const DIST = process.env.SMOKE_DIR || 'dist';
 if (!existsSync(`${DIST}/index.html`)) {
@@ -650,49 +649,55 @@ await scenario('multi-tab: loading remote progress discards pending local edits'
     await ctx.close();
 });
 
-await scenario('daily: numbered puzzles, today by UTC+8 day, kept across midnight, archive', async () => {
-    const entry = manifest.entries[8]; // No.9
-    const t1 = Date.parse(`${dateOfNumber(manifest, entry.no)}T15:50:00Z`); // 23:50 UTC+8 on No.9's day
-    const { page, ctx, errors } = await open({ hash: '#/daily', clock: t1, seed: seedDone(['FC01']) });
-    await waitPlay(page, entry.id);
-    assert.equal(new URL(page.url()).hash, '#/daily/9', 'the number is carried in the URL');
-    assert.match(await page.locator('.topbar-title .title').textContent(), /No\.9/);
-    const [r0, r1] = await page.evaluate(() => window.__fourColors.play.level.fixed.map((c, i) => (c < 0 ? i : -1)).filter(i => i >= 0));
-    await pickColor(page, 0);
-    await tap(page, r0);
-    await page.clock.setSystemTime(t1 + 20 * 60 * 1000); // 00:10 UTC+8, No.10's day
-    await pickColor(page, 1);
-    await tap(page, r1);
-    assert.equal(await page.evaluate(() => window.__fourColors.play.level.id), entry.id, 'same puzzle after midnight');
+await scenario('numbered bank: No.1 to No.60 are immediately selectable regardless of calendar', async () => {
+    const { page, ctx, errors } = await open({ hash: '#/atlas/daily', clock: Date.parse('2020-01-01T12:00:00Z'), seed: seedDone(['FC01']) });
+    await page.waitForSelector('.daily-archive');
+    assert.equal(await page.locator('.daily-tile').count(), manifest.entries.length);
+    assert.equal(await page.locator('.daily-tile[href="#/daily/60"]').count(), 1);
+    assert.match(await page.locator('.tab-panel').textContent(), /编号地图/);
+    await page.click('.daily-tile[href="#/daily/60"]');
+    await waitPlay(page, 'D060');
+    assert.equal(new URL(page.url()).hash, '#/daily/60');
+    await page.clock.setSystemTime(Date.parse('2035-01-01T03:30:00Z'));
     await page.reload();
-    await waitPlay(page, entry.id);
-    assert.equal((await colors(page))[r1], 1, 'reloading after midnight still finishes No.9');
-    await page.evaluate(() => { location.hash = '#/atlas/daily'; });
-    await page.waitForSelector('.daily');
-    const panel = await page.locator('.tab-panel').textContent();
-    assert.match(panel, /新的一天/);
-    assert.match(panel, /No\.10/);
-    assert.match(panel, /继续 No\.9/);
-    assert.equal(await page.locator('.daily-tile').count(), 9, 'No.1–No.9 are in the archive');
-    await page.evaluate(() => { location.hash = '#/daily/11'; });
-    await page.waitForSelector('.atlas');
-    assert.equal(new URL(page.url()).hash, '#/atlas/daily', 'future numbers do not open early');
+    await waitPlay(page, 'D060');
+    assert.equal(new URL(page.url()).hash, '#/daily/60', 'the clock cannot change the selected number');
+    await page.evaluate(() => { location.hash = '#/daily/61'; });
+    await page.waitForSelector('.daily-archive');
+    assert.equal(new URL(page.url()).hash, '#/atlas/daily', 'out-of-range numbers remain invalid');
     await page.evaluate(() => { location.hash = '#/daily'; });
-    await waitPlay(page, manifest.entries[9].id);
+    await waitPlay(page, 'D060');
     await page.evaluate(() => { location.hash = '#/daily/3'; });
-    await waitPlay(page, manifest.entries[2].id);
+    await waitPlay(page, 'D003');
     assert.deepEqual(errors, []);
     await ctx.close();
 });
 
-await scenario('daily: a failed download offers a retry instead of breaking the page', async () => {
+await scenario('a legacy dated session resumes with progress intact', async () => {
+    const seed = seedDone(['FC01']);
+    seed.daily.session = { date: '2026-10-13', no: 9, id: 'D009', revision: 1 };
+    seed.daily.records.D001 = { revision: 1, completed: true, assisted: false };
+    const { page, ctx } = await open({ hash: '#/daily', seed });
+    await waitPlay(page, 'D009');
+    assert.equal(new URL(page.url()).hash, '#/daily/9');
+    assert.deepEqual(await page.evaluate(() => window.__fourColors.snapshot.daily.session),
+        { no: 9, id: 'D009', revision: 1 });
+    await page.evaluate(() => { location.hash = '#/atlas/daily'; });
+    await page.waitForSelector('.daily-archive');
+    assert.equal(await page.locator('.daily-tile').count(), 60);
+    assert.equal(await page.locator('.daily-tile.is-done').count(), 1);
+    assert.match(await page.locator('.daily-card').textContent(), /No.9/);
+    await ctx.close();
+});
+
+await scenario('numbered map download retries the same numbered URL', async () => {
     srv.server.failDaily = true;
-    const { page, ctx } = await open({ hash: '#/daily', clock: Date.parse(`${dateOfNumber(manifest, 4)}T04:00:00Z`), seed: seedDone(['FC01']) });
+    const { page, ctx } = await open({ hash: '#/daily/4', seed: seedDone(['FC01']) });
     await page.waitForSelector('.toast .toast-actions', { timeout: 5000 });
     assert.match(await page.locator('.toast').textContent(), /暂时无法载入/);
     srv.server.failDaily = false;
-    await page.click('.toast .btn-primary'); // Retry alone must refetch and open the daily
-    await waitPlay(page, manifest.entries[3].id);
+    await page.click('.toast .btn-primary');
+    await waitPlay(page, 'D004');
     assert.equal(new URL(page.url()).hash, '#/daily/4');
     await ctx.close();
 });
@@ -726,7 +731,7 @@ await scenario('collection: recolor a restored page, save it, export it', async 
 });
 
 await scenario('daily collection: save, reload, thumbnail and export preserve solve records', async () => {
-    const { page, ctx } = await open({ hash: '#/daily/1', clock: new Date(dateOfNumber(manifest, 1) + 'T04:00:00Z') });
+    const { page, ctx } = await open({ hash: '#/daily/1' });
     await waitPlay(page, 'D001');
     await solveFromWitness(page);
     const original = await page.evaluate(() => window.__fourColors.snapshot.progress.D001.solution.slice());
@@ -751,12 +756,11 @@ await scenario('daily collection: save, reload, thumbnail and export preserve so
     await page.click(`a[href="#/c/${uid}"]`);
     await page.waitForSelector('.collect-bar:not([hidden])');
     assert.equal((await colors(page))[0], (original[0] + 1) % 4);
-    // The collection loader must not expose unreleased daily content.
-    const futureRequests = [];
-    page.on('request', request => { if (request.url().includes('D002.r')) futureRequests.push(request.url()); });
+    // An unfinished numbered puzzle can be played but not edited as a collection.
     await page.evaluate(() => { location.hash = '#/collect/D002'; });
-    await page.waitForFunction(() => location.hash === '#/');
-    assert.deepEqual(futureRequests, []);
+    await waitPlay(page, 'D002');
+    assert.equal(new URL(page.url()).hash, '#/daily/2');
+    assert.equal(await page.evaluate(() => window.__fourColors.play.kind), 'daily');
     await ctx.close();
 });
 
